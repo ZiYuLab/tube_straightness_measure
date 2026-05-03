@@ -1,0 +1,106 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="measure_world">
+
+    <!-- 基础物理与光照 -->
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <light name="sun" type="directional">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.5 0.5 0.5 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!--
+      管道模型预留位置：
+      - 管道轴向为 X 轴，中心在原点（z=0）
+      - 由 launch 文件动态加载（ros_gz_sim create）
+      - 示例：ros2 run ros_gz_sim create -world measure_world -file straight_tube.sdf
+    -->
+
+    <!-- ===== 相机（静态，从侧上方 45° 向内向下看） ===== -->
+    <!--
+      两台 RGBD 相机位于 YZ 平面（x=0），
+      位于 y=±1.0m、z=1.0m，呈 45° 斜向内俯视管道轴线。
+      SDF camera 默认光轴朝 +X，通过 rpy 旋转使光轴指向管道。
+    -->
+
+    <!-- rgbd_1：+Y 侧，45° 向内向下 -->
+    <model name="rgbd_1">
+      <static>true</static>
+      <!-- yaw=-π/2 使+X轴朝-Y（朝管道），pitch=+π/4 使光轴向下45° -->
+      <pose>0 1.0 1.0  0 0.7854 -1.5708</pose>
+      <link name="camera_link">
+        <visual name="body">
+          <geometry><box><size>0.05 0.1 0.05</size></box></geometry>
+          <material>
+            <ambient>0.2 0.2 0.8 1</ambient>
+            <diffuse>0.2 0.2 0.8 1</diffuse>
+          </material>
+        </visual>
+        <sensor name="rgbd_1" type="rgbd_camera">
+          <always_on>true</always_on>
+          <update_rate>10</update_rate>
+          <topic>/rgbd_1</topic>
+          <camera>
+            <horizontal_fov>1.047</horizontal_fov>
+            <image>
+              <width>848</width>
+              <height>480</height>
+              <format>RGB_INT8</format>
+            </image>
+            <clip><near>0.1</near><far>2.0</far></clip>
+            <depth_camera>
+              <clip><near>0.1</near><far>2.0</far></clip>
+            </depth_camera>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+
+    <!-- rgbd_2：-Y 侧，45° 向内向下 -->
+    <model name="rgbd_2">
+      <static>true</static>
+      <!-- yaw=+π/2 使+X轴朝+Y（朝管道），pitch=+π/4 使光轴向下45° -->
+      <pose>0 -1.0 1.0  0 0.7854 1.5708</pose>
+      <link name="camera_link">
+        <visual name="body">
+          <geometry><box><size>0.05 0.1 0.05</size></box></geometry>
+          <material>
+            <ambient>0.2 0.2 0.8 1</ambient>
+            <diffuse>0.2 0.2 0.8 1</diffuse>
+          </material>
+        </visual>
+        <sensor name="rgbd_2" type="rgbd_camera">
+          <always_on>true</always_on>
+          <update_rate>10</update_rate>
+          <topic>/rgbd_2</topic>
+          <camera>
+            <horizontal_fov>1.047</horizontal_fov>
+            <image>
+              <width>848</width>
+              <height>480</height>
+              <format>RGB_INT8</format>
+            </image>
+            <clip><near>0.1</near><far>2.0</far></clip>
+            <depth_camera>
+              <clip><near>0.1</near><far>2.0</far></clip>
+            </depth_camera>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+
+  </world>
+</sdf>

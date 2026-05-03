@@ -1,0 +1,23 @@
+- ros_topic_name: /clock
+  gz_topic_name: /clock
+  ros_type_name: rosgraph_msgs/msg/Clock
+  gz_type_name: gz.msgs.Clock
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /rgbd_1/points
+  gz_topic_name: /rgbd_1/points
+  ros_type_name: sensor_msgs/msg/PointCloud2
+  gz_type_name: gz.msgs.PointCloudPacked
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /rgbd_2/points
+  gz_topic_name: /rgbd_2/points
+  ros_type_name: sensor_msgs/msg/PointCloud2
+  gz_type_name: gz.msgs.PointCloudPacked
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /set_pose
+  gz_topic_name: /world/measure_world/set_pose
+  ros_type_name: geometry_msgs/msg/Pose
+  gz_type_name: gz.msgs.Pose
+  direction: ROS_TO_GZ
