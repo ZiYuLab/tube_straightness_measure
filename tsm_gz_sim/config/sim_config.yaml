@@ -1,8 +1,10 @@
 tsm_gz_sim_node:
   ros__parameters:
     use_sim_time: true
-    set_pose_topic: /set_pose
-    tube_pose_topic: /tube_pose
     control_timer_ms: 10
     tube_length: 10.0
     speed: 0.1
+    set_pose_service: /world/measure_world/set_pose
+    tube_model_name: straight_tube
+    tf_frame_id: world
+    tf_child_frame_id: tube
