@@ -21,7 +21,7 @@ cmake "../ceres-solver-${CERES_VERSION}" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_TESTING=OFF \
   -DBUILD_EXAMPLES=OFF
-make -j"$(nproc)"
+make -j 2
 sudo make install
 sudo ldconfig
 

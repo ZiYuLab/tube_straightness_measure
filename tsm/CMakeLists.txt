@@ -10,11 +10,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(ament_cmake_auto REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(Ceres REQUIRED)
 ament_auto_find_build_dependencies()
 
 ament_auto_add_library(${PROJECT_NAME} SHARED
   src/tsm_node.cpp
+  src/fit_each_segment.cpp
+  src/integral_process.cpp
 )
+target_include_directories(${PROJECT_NAME} PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} Ceres::ceres)
 rclcpp_components_register_node(${PROJECT_NAME}
   PLUGIN "tsm::TsmNode"
   EXECUTABLE tsm_node

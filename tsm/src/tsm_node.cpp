@@ -19,12 +19,12 @@
 #include "pcl/common/pca.h"
 
 #include "tf2_eigen/tf2_eigen.hpp"
+#include "cv_bridge/cv_bridge.hpp"
 
 #include "rclcpp_components/register_node_macro.hpp"
 
 namespace tsm
 {
-
 
 TsmNode::TsmNode(const rclcpp::NodeOptions& options) : Node("tsm_node", options)
 {
@@ -48,6 +48,10 @@ void TsmNode::setupParams()
       declare_parameter<std::string>("topics.seg2_pointcloud", "seg2_points");
   params_.topics_.seg3_pointcloud =
       declare_parameter<std::string>("topics.seg3_pointcloud", "seg3_points");
+  params_.topics_.debug_image =
+      declare_parameter<std::string>("topics.debug_image", "debug_image");
+  params_.topics_.centerline_marker =
+      declare_parameter<std::string>("topics.centerline_marker", "centerline");
 
   params_.frames_.rgbd_1_frame = declare_parameter<std::string>(
       "frames.rgbd_1_frame", "rgbd_1/camera_link/rgbd_1");
@@ -70,6 +74,20 @@ void TsmNode::setupParams()
       declare_parameter<double>("valid_pc_area.z_min", -0.5);
   params_.valid_pc_area_.z_max =
       declare_parameter<double>("valid_pc_area.z_max", 0.5);
+
+  params_.cutting_fittting_.length_of_each_segment =
+      declare_parameter<double>("cutting_fittting.length_of_each_segment", 0.1);
+  params_.cutting_fittting_.ransac_distance_threshold =
+      declare_parameter<double>("cutting_fittting.ransac_distance_threshold",
+                                0.005);
+  params_.cutting_fittting_.ransac_max_iterations =
+      declare_parameter<int>("cutting_fittting.ransac_max_iterations", 100);
+  params_.cutting_fittting_.min_points_in_segment =
+      declare_parameter<int>("cutting_fittting.min_points_in_segment", 200);
+
+  params_.integral_process_.bin_length = declare_parameter<double>(
+      "integral_process.bin_length",
+      params_.cutting_fittting_.length_of_each_segment);
 }
 
 void TsmNode::setupTf()
@@ -99,6 +117,10 @@ void TsmNode::setupPub()
   seg1_pc_pub_ = create_publisher<PC2>(params_.topics_.seg1_pointcloud, 10);
   seg2_pc_pub_ = create_publisher<PC2>(params_.topics_.seg2_pointcloud, 10);
   seg3_pc_pub_ = create_publisher<PC2>(params_.topics_.seg3_pointcloud, 10);
+  debug_img_pub_ = create_publisher<sensor_msgs::msg::Image>(
+      params_.topics_.debug_image, 10);
+  centerline_pub_ = create_publisher<visualization_msgs::msg::Marker>(
+      params_.topics_.centerline_marker, 10);
 }
 
 void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
@@ -242,15 +264,17 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
 
   float x_actual_min = std::numeric_limits<float>::max();
   float x_actual_max = std::numeric_limits<float>::lowest();
-  for (const auto & pt : aligned->points)
+  for (const auto& pt : aligned->points)
   {
-    if (pt.x < x_actual_min) x_actual_min = pt.x;
-    if (pt.x > x_actual_max) x_actual_max = pt.x;
+    if (pt.x < x_actual_min)
+      x_actual_min = pt.x;
+    if (pt.x > x_actual_max)
+      x_actual_max = pt.x;
   }
   double seg_len = params_.cutting_fittting_.length_of_each_segment;
   double x1min = x_actual_min;
   double x1max = x1min + seg_len;
-  double xc    = (x_actual_min + x_actual_max) / 2.0;
+  double xc = (x_actual_min + x_actual_max) / 2.0;
   double x2min = xc - seg_len / 2.0;
   double x2max = xc + seg_len / 2.0;
   double x3max = x_actual_max;
@@ -269,7 +293,11 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   // -- If there are too few points in one segment, return.
   if (seg1->size() < 50 || seg2->size() < 50 || seg3->size() < 50)
   {
-    RCLCPP_WARN(get_logger(), "Seg1: %zu, Seg2: %zu, Seg3: %zu", seg1->size(), seg2->size(), seg3->size());
+    RCLCPP_WARN(get_logger(),
+                "Seg1: %zu, Seg2: %zu, Seg3: %zu",
+                seg1->size(),
+                seg2->size(),
+                seg3->size());
     RCLCPP_WARN(get_logger(), "Too few points in one segment, skipping...");
     return;
   }
@@ -287,7 +315,103 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   publishSeg(seg2, seg2_pc_pub_);
   publishSeg(seg3, seg3_pc_pub_);
 
-  // 7.
+  // 7. Fit each segment to find the circle center and radius.
+  Eigen::Vector3f center1, center2, center3;
+  cv::Mat         debug_img1, debug_img2, debug_img3;
+  fitEachSegment(seg1, (x1min + x1max) / 2.0, center1, debug_img1);
+  fitEachSegment(seg2, (x2min + x2max) / 2.0, center2, debug_img2);
+  fitEachSegment(seg3, (x3min + x3max) / 2.0, center3, debug_img3);
+
+  // 8. Compute second order difference for this frame.
+  Eigen::Vector2f m1 = center1.segment<2>(1);
+  Eigen::Vector2f m2 = center2.segment<2>(1);
+  Eigen::Vector2f m3 = center3.segment<2>(1);
+  float           d = center2.x() - center1.x();
+  Eigen::Vector2f ms = (m3 - 2 * m2 + m1) / (d * d);
+
+  Eigen::Vector3f ms_3d(center2.x(), ms.x(), ms.y());
+
+  // 9. transform the 2-diff data to tube frame.
+  Eigen::Matrix3f R_pca = transform.block<3, 3>(0, 0);
+  Eigen::Affine3f world_to_tube_f =
+      tf2::transformToEigen(world_to_tube.transform).cast<float>();
+
+  Eigen::Vector3f ms_world =
+      R_pca.transpose() * Eigen::Vector3f(0, ms.x(), ms.y());
+  Eigen::Vector3f ms_tube = world_to_tube_f.linear() * ms_world;
+
+  float pos_tube_x = (world_to_tube_f * (R_pca.transpose() * center2)).x();
+  int bin_idx = static_cast<int>(
+      std::floor(pos_tube_x / params_.integral_process_.bin_length));
+  auto& [sum, count] = diff_bins_[bin_idx];
+  sum += Eigen::Vector3f(pos_tube_x, ms_tube.y(), ms_tube.z());
+  count++;
+
+  if (!diff_bins_.empty())
+    integralProcess(diff_bins_, center_points_);
+
+  // 11. Draw circle fitting results for each segment (DEBUG)
+  cv::putText(debug_img1,
+              "seg1",
+              cv::Point(5, 15),
+              cv::FONT_HERSHEY_SIMPLEX,
+              0.5,
+              cv::Scalar(255, 255, 255),
+              1);
+  cv::putText(debug_img2,
+              "seg2",
+              cv::Point(5, 15),
+              cv::FONT_HERSHEY_SIMPLEX,
+              0.5,
+              cv::Scalar(255, 255, 255),
+              1);
+  cv::putText(debug_img3,
+              "seg3",
+              cv::Point(5, 15),
+              cv::FONT_HERSHEY_SIMPLEX,
+              0.5,
+              cv::Scalar(255, 255, 255),
+              1);
+
+  cv::Mat combined;
+  cv::hconcat(std::vector<cv::Mat>{debug_img1, debug_img2, debug_img3},
+              combined);
+
+  // Publish debug image
+  auto img_msg = cv_bridge::CvImage(std_msgs::msg::Header{}, "bgr8", combined)
+                     .toImageMsg();
+  img_msg->header.stamp = pc1->header.stamp;
+  debug_img_pub_->publish(*img_msg);
+
+  // Publish centerline marker
+  if (!center_points_.empty())
+  {
+    Eigen::Affine3f tube_to_world = world_to_tube_f.inverse();
+
+    visualization_msgs::msg::Marker marker;
+    marker.header.stamp    = pc1->header.stamp;
+    marker.header.frame_id = params_.frames_.world_frame;
+    marker.type            = visualization_msgs::msg::Marker::LINE_STRIP;
+    marker.action          = visualization_msgs::msg::Marker::ADD;
+    marker.scale.x         = 0.01;
+    marker.color.r         = 1.0f;
+    marker.color.a         = 1.0f;
+    for (const auto& pt : center_points_)
+    {
+      Eigen::Vector3f pw = tube_to_world * pt;
+      geometry_msgs::msg::Point p;
+      p.x = pw.x();
+      p.y = pw.y();
+      p.z = pw.z();
+      marker.points.push_back(p);
+    }
+    RCLCPP_INFO(get_logger(), "Marker points: %zu, first: (%.3f, %.3f, %.3f)",
+                marker.points.size(),
+                marker.points.empty() ? 0.0 : marker.points.front().x,
+                marker.points.empty() ? 0.0 : marker.points.front().y,
+                marker.points.empty() ? 0.0 : marker.points.front().z);
+    centerline_pub_->publish(marker);
+  }
 }
 } // namespace tsm
 

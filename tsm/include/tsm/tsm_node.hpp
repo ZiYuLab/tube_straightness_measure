@@ -16,7 +16,13 @@
 #include "message_filters/synchronizer.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/msg/image.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 #include "opencv2/opencv.hpp"
+#include "pcl/point_types.h"
+#include "pcl/point_cloud.h"
+#include "Eigen/Core"
+#include <map>
 
 namespace tsm
 {
@@ -40,8 +46,13 @@ private:
   void setupSub();
   void onPointClouds(const PC2::ConstSharedPtr& pc1,
                      const PC2::ConstSharedPtr& pc2);
-  void fitEachSegment(const PointCloudT::Ptr& seg, double center_x,
-    Eigen::Vector3d& center, cv::Mat& debug_img);
+  void fitEachSegment(const PointCloudT::Ptr& seg,
+                      float                   center_x,
+                      Eigen::Vector3f&        center,
+                      cv::Mat&                debug_img);
+  void integralProcess(
+      const std::map<int, std::pair<Eigen::Vector3f, int>>& diff_bins,
+      std::vector<Eigen::Vector3f>&                         center_points);
 
   struct
   {
@@ -53,6 +64,8 @@ private:
       std::string seg1_pointcloud;
       std::string seg2_pointcloud;
       std::string seg3_pointcloud;
+      std::string debug_image;
+      std::string centerline_marker;
     } topics_;
 
     struct
@@ -83,7 +96,17 @@ private:
 
       // Each segment will be how long along the tube axis.
       double length_of_each_segment = 0.1;
+
+      // RANSAC parameters
+      int    ransac_max_iterations = 100;
+      double ransac_distance_threshold = 0.005;
+
     } cutting_fittting_;
+
+    struct
+    {
+      double bin_length = 0.1;
+    } integral_process_;
 
   } params_;
 
@@ -92,10 +115,15 @@ private:
   std::shared_ptr<message_filters::Synchronizer<SyncPolicy>> sync_;
   std::shared_ptr<tf2_ros::Buffer>                           tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener>                tf_listener_;
-  rclcpp::Publisher<PC2>::SharedPtr                          merged_pc_pub_;
-  rclcpp::Publisher<PC2>::SharedPtr                          seg1_pc_pub_;
-  rclcpp::Publisher<PC2>::SharedPtr                          seg2_pc_pub_;
-  rclcpp::Publisher<PC2>::SharedPtr                          seg3_pc_pub_;
+  rclcpp::Publisher<PC2>::SharedPtr                                    merged_pc_pub_;
+  rclcpp::Publisher<PC2>::SharedPtr                                    seg1_pc_pub_;
+  rclcpp::Publisher<PC2>::SharedPtr                                    seg2_pc_pub_;
+  rclcpp::Publisher<PC2>::SharedPtr                                    seg3_pc_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr                debug_img_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr        centerline_pub_;
+
+  std::map<int, std::pair<Eigen::Vector3f, int>> diff_bins_;
+  std::vector<Eigen::Vector3f>                   center_points_;
 };
 
 } // namespace tsm

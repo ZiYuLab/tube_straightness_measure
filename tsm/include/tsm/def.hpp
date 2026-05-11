@@ -18,7 +18,7 @@ struct Circle_t
 {
   Eigen::Vector2d center_2d;
   Eigen::Vector3d center;
-  double radius;
-}
+  double          radius;
+};
 
 } // namespace tsm
