@@ -16,9 +16,13 @@
 #include "message_filters/synchronizer.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "opencv2/opencv.hpp"
 
 namespace tsm
 {
+
+using PointT = pcl::PointXYZRGB;
+using PointCloudT = pcl::PointCloud<PointT>;
 
 class TsmNode : public rclcpp::Node
 {
@@ -36,6 +40,8 @@ private:
   void setupSub();
   void onPointClouds(const PC2::ConstSharedPtr& pc1,
                      const PC2::ConstSharedPtr& pc2);
+  void fitEachSegment(const PointCloudT::Ptr& seg, double center_x,
+    Eigen::Vector3d& center, cv::Mat& debug_img);
 
   struct
   {

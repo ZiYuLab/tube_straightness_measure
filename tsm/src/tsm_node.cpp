@@ -25,8 +25,6 @@
 namespace tsm
 {
 
-using PointT = pcl::PointXYZRGB;
-using PointCloudT = pcl::PointCloud<PointT>;
 
 TsmNode::TsmNode(const rclcpp::NodeOptions& options) : Node("tsm_node", options)
 {
@@ -207,7 +205,7 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
 
   pcl::VoxelGrid<PointT> vgf;
   vgf.setInputCloud(merged);
-  vgf.setLeafSize(0.005f, 0.005f, 0.005f);
+  vgf.setLeafSize(0.002f, 0.002f, 0.002f);
   vgf.filter(*processed);
 
   // TODO: Minimum points
@@ -221,7 +219,7 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   Eigen::Vector3f tube_axis_direction;
 
   float dot_product = eigen_vectors.col(0).dot(Eigen::Vector3f::UnitX());
-  if (std::abs(dot_product) < 0.707) // 45 degree
+  if (std::abs(dot_product) > 0.707) // col(0) aligns with X → tube axis
     tube_axis_direction = eigen_vectors.col(0);
   else
     tube_axis_direction = eigen_vectors.col(1);
@@ -242,14 +240,21 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   PointCloudT::Ptr seg2(new PointCloudT);
   PointCloudT::Ptr seg3(new PointCloudT);
 
-  double x1min = params_.valid_pc_area_.x_min;
-  double x1max = x1min + params_.cutting_fittting_.length_of_each_segment;
-  double xc =
-      (params_.valid_pc_area_.x_min + params_.valid_pc_area_.x_max) / 2.0;
-  double x2min = xc - params_.cutting_fittting_.length_of_each_segment / 2.0;
-  double x2max = xc + params_.cutting_fittting_.length_of_each_segment / 2.0;
-  double x3max = params_.valid_pc_area_.x_max;
-  double x3min = x3max - params_.cutting_fittting_.length_of_each_segment;
+  float x_actual_min = std::numeric_limits<float>::max();
+  float x_actual_max = std::numeric_limits<float>::lowest();
+  for (const auto & pt : aligned->points)
+  {
+    if (pt.x < x_actual_min) x_actual_min = pt.x;
+    if (pt.x > x_actual_max) x_actual_max = pt.x;
+  }
+  double seg_len = params_.cutting_fittting_.length_of_each_segment;
+  double x1min = x_actual_min;
+  double x1max = x1min + seg_len;
+  double xc    = (x_actual_min + x_actual_max) / 2.0;
+  double x2min = xc - seg_len / 2.0;
+  double x2max = xc + seg_len / 2.0;
+  double x3max = x_actual_max;
+  double x3min = x3max - seg_len;
 
   pcl::PassThrough<PointT> pass;
   pass.setInputCloud(aligned);
@@ -264,6 +269,7 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   // -- If there are too few points in one segment, return.
   if (seg1->size() < 50 || seg2->size() < 50 || seg3->size() < 50)
   {
+    RCLCPP_WARN(get_logger(), "Seg1: %zu, Seg2: %zu, Seg3: %zu", seg1->size(), seg2->size(), seg3->size());
     RCLCPP_WARN(get_logger(), "Too few points in one segment, skipping...");
     return;
   }
