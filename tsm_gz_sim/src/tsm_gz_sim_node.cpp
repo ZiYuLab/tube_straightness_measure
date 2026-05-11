@@ -1,5 +1,7 @@
 #include "gz_sim/tsm_gz_sim_node.hpp"
 
+#include <cmath>
+
 #include "gz/msgs/boolean.pb.h"
 #include "gz/msgs/pose.pb.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
@@ -20,6 +22,8 @@ TsmGzSimNode::TsmGzSimNode(const rclcpp::NodeOptions& options)
   tube_model_name_ = declare_parameter<std::string>("tube_model_name", "straight_tube");
   tf_frame_id_ = declare_parameter<std::string>("tf_frame_id", "world");
   tf_child_frame_id_ = declare_parameter<std::string>("tf_child_frame_id", "tube");
+  vib_amplitude_ = declare_parameter<double>("vib_amplitude", 0.002);
+  vib_frequency_ = declare_parameter<double>("vib_frequency", 1.0);
 
   dt_s_ = timer_ms / 1000.0;
   x_start_ = -tube_length / 2.0;
@@ -61,6 +65,7 @@ void TsmGzSimNode::onTimer()
     return;
 
   x_pos_ += direction_ * speed_ * dt_s_;
+  elapsed_s_ += dt_s_;
   if (x_pos_ >= x_end_)
   {
     x_pos_ = x_end_;
@@ -72,9 +77,13 @@ void TsmGzSimNode::onTimer()
     direction_ = 0;
   }
 
+  double vib = vib_amplitude_ * std::sin(2.0 * M_PI * vib_frequency_ * elapsed_s_);
+
   gz::msgs::Pose req;
   req.set_name(tube_model_name_);
   req.mutable_position()->set_x(x_pos_);
+  req.mutable_position()->set_y(vib);
+  req.mutable_position()->set_z(vib);
   req.mutable_orientation()->set_w(1.0);
 
   gz::msgs::Boolean rep;

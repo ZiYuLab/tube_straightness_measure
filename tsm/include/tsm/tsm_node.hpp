@@ -52,7 +52,14 @@ private:
                       cv::Mat&                debug_img);
   void integralProcess(
       const std::map<int, std::pair<Eigen::Vector3f, int>>& diff_bins,
+      const std::map<int, std::pair<Eigen::Vector3f, int>>& abs_bins,
       std::vector<Eigen::Vector3f>&                         center_points);
+
+  // Returns smoothed deflection using Kalman filter fusing curvature and
+  // absolute center position. One channel (y or z) at a time.
+  std::vector<float> kalmanSmooth(const std::vector<float>& kappa,
+                                  const std::vector<float>& abs_pos,
+                                  const std::vector<float>& x_coords);
 
   struct
   {
@@ -98,7 +105,7 @@ private:
       double length_of_each_segment = 0.1;
 
       // RANSAC parameters
-      int    ransac_max_iterations = 100;
+      int    ransac_max_iterations = 50;
       double ransac_distance_threshold = 0.005;
 
     } cutting_fittting_;
@@ -110,19 +117,23 @@ private:
 
   } params_;
 
-  message_filters::Subscriber<PC2>                           rgbd_1_sub_;
-  message_filters::Subscriber<PC2>                           rgbd_2_sub_;
-  std::shared_ptr<message_filters::Synchronizer<SyncPolicy>> sync_;
-  std::shared_ptr<tf2_ros::Buffer>                           tf_buffer_;
-  std::shared_ptr<tf2_ros::TransformListener>                tf_listener_;
-  rclcpp::Publisher<PC2>::SharedPtr                                    merged_pc_pub_;
-  rclcpp::Publisher<PC2>::SharedPtr                                    seg1_pc_pub_;
-  rclcpp::Publisher<PC2>::SharedPtr                                    seg2_pc_pub_;
-  rclcpp::Publisher<PC2>::SharedPtr                                    seg3_pc_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr                debug_img_pub_;
-  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr        centerline_pub_;
+  message_filters::Subscriber<PC2>                              rgbd_1_sub_;
+  message_filters::Subscriber<PC2>                              rgbd_2_sub_;
+  std::shared_ptr<message_filters::Synchronizer<SyncPolicy>>    sync_;
+  std::shared_ptr<tf2_ros::Buffer>                              tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener>                   tf_listener_;
+  Eigen::Matrix4f                                               transform_rgbd1_;
+  Eigen::Matrix4f                                               transform_rgbd2_;
+  bool                                                          static_tf_ready_{false};
+  rclcpp::Publisher<PC2>::SharedPtr                             merged_pc_pub_;
+  rclcpp::Publisher<PC2>::SharedPtr                             seg1_pc_pub_;
+  rclcpp::Publisher<PC2>::SharedPtr                             seg2_pc_pub_;
+  rclcpp::Publisher<PC2>::SharedPtr                             seg3_pc_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr         debug_img_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr centerline_pub_;
 
   std::map<int, std::pair<Eigen::Vector3f, int>> diff_bins_;
+  std::map<int, std::pair<Eigen::Vector3f, int>> abs_bins_;
   std::vector<Eigen::Vector3f>                   center_points_;
 };
 

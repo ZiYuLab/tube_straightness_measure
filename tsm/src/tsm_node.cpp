@@ -8,6 +8,7 @@
 #include "tsm/tsm_node.hpp"
 
 #include <chrono>
+#include <future>
 
 #include "pcl_conversions/pcl_conversions.h"
 #include "pcl/point_types.h"
@@ -131,8 +132,6 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   // Search TF from world to tube
   auto                                 stamp = pc1->header.stamp;
   geometry_msgs::msg::TransformStamped world_to_tube;
-  geometry_msgs::msg::TransformStamped wrold_to_rgbd1;
-  geometry_msgs::msg::TransformStamped wrold_to_rgbd2;
   try
   {
     world_to_tube =
@@ -146,71 +145,56 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
     RCLCPP_ERROR(get_logger(), "Transform error: %s", ex.what());
   }
 
-  try
+  // 1. Merge the two point clouds — transform directly into merged.
+  if (!static_tf_ready_)
   {
-    wrold_to_rgbd1 =
-        tf_buffer_->lookupTransform(params_.frames_.world_frame,
-                                    params_.frames_.rgbd_1_frame,
-                                    stamp,
-                                    rclcpp::Duration::from_seconds(0.1));
+    try
+    {
+      transform_rgbd1_ = tf2::transformToEigen(tf_buffer_->lookupTransform(
+                                                   params_.frames_.world_frame,
+                                                   params_.frames_.rgbd_1_frame,
+                                                   tf2::TimePointZero))
+                             .matrix()
+                             .cast<float>();
+      transform_rgbd2_ = tf2::transformToEigen(tf_buffer_->lookupTransform(
+                                                   params_.frames_.world_frame,
+                                                   params_.frames_.rgbd_2_frame,
+                                                   tf2::TimePointZero))
+                             .matrix()
+                             .cast<float>();
+      static_tf_ready_ = true;
+    }
+    catch (const tf2::TransformException& ex)
+    {
+      RCLCPP_WARN(get_logger(), "Static TF not ready: %s", ex.what());
+      return;
+    }
   }
-  catch (const tf2::TransformException& ex)
+
+  PointCloudT::Ptr merged(new PointCloudT);
   {
-    RCLCPP_ERROR(get_logger(), "Transform error: %s", ex.what());
+    PointCloudT::Ptr c1(new PointCloudT), c2(new PointCloudT);
+    auto f = std::async(std::launch::async,
+                        [&] { pcl::fromROSMsg(*pc2, *c2); });
+    pcl::fromROSMsg(*pc1, *c1);
+    f.wait();
+    pcl::transformPointCloud(*c1, *c1, transform_rgbd1_);
+    pcl::transformPointCloud(*c2, *c2, transform_rgbd2_);
+    *merged = *c1 + *c2;
   }
 
-  try
+  // 2. Cut the merged point cloud to a box area around the tube.
   {
-    wrold_to_rgbd2 =
-        tf_buffer_->lookupTransform(params_.frames_.world_frame,
-                                    params_.frames_.rgbd_2_frame,
-                                    stamp,
-                                    rclcpp::Duration::from_seconds(0.1));
+    float xmin = params_.valid_pc_area_.x_min, xmax = params_.valid_pc_area_.x_max;
+    float ymin = params_.valid_pc_area_.y_min, ymax = params_.valid_pc_area_.y_max;
+    float zmin = params_.valid_pc_area_.z_min, zmax = params_.valid_pc_area_.z_max;
+    merged->erase(
+        std::remove_if(merged->begin(), merged->end(), [&](const PointT& p) {
+          return p.x < xmin || p.x > xmax || p.y < ymin || p.y > ymax ||
+                 p.z < zmin || p.z > zmax;
+        }),
+        merged->end());
   }
-  catch (const tf2::TransformException& ex)
-  {
-    RCLCPP_ERROR(get_logger(), "Transform error: %s", ex.what());
-  }
-
-  // 1. Merge the two point clouds.
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr c1(
-      new pcl::PointCloud<pcl::PointXYZRGB>);
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr c2(
-      new pcl::PointCloud<pcl::PointXYZRGB>);
-  pcl::fromROSMsg(*pc1, *c1);
-  pcl::fromROSMsg(*pc2, *c2);
-
-  Eigen::Matrix4f transform1 =
-      tf2::transformToEigen(wrold_to_rgbd1.transform).matrix().cast<float>();
-  Eigen::Matrix4f transform2 =
-      tf2::transformToEigen(wrold_to_rgbd2.transform).matrix().cast<float>();
-
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr merged(
-      new pcl::PointCloud<pcl::PointXYZRGB>);
-
-  pcl::transformPointCloud(*c1, *c1, transform1);
-  pcl::transformPointCloud(*c2, *c2, transform2);
-
-  *merged = *c1 + *c2;
-
-  // 2. Cut the merged point cloud to a box area around the tube to remove
-  // outliers and background points.
-
-  Eigen::Vector4f min_pt(params_.valid_pc_area_.x_min,
-                         params_.valid_pc_area_.y_min,
-                         params_.valid_pc_area_.z_min,
-                         1.0);
-
-  Eigen::Vector4f max_pt(params_.valid_pc_area_.x_max,
-                         params_.valid_pc_area_.y_max,
-                         params_.valid_pc_area_.z_max,
-                         1.0);
-
-  pcl::CropBox<pcl::PointXYZRGB> crop_box;
-  crop_box.setMin(min_pt);
-  crop_box.setMax(max_pt);
-  crop_box.setInputCloud(merged);
-  crop_box.filter(*merged);
 
   // 3. Sent merged and filter result to ros2 (DEBUG)
   PC2 merged_msg;
@@ -227,7 +211,7 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
 
   pcl::VoxelGrid<PointT> vgf;
   vgf.setInputCloud(merged);
-  vgf.setLeafSize(0.002f, 0.002f, 0.002f);
+  vgf.setLeafSize(0.015f, 0.015f, 0.015f);
   vgf.filter(*processed);
 
   // TODO: Minimum points
@@ -315,12 +299,18 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   publishSeg(seg2, seg2_pc_pub_);
   publishSeg(seg3, seg3_pc_pub_);
 
-  // 7. Fit each segment to find the circle center and radius.
+  // 7. Fit each segment to find the circle center and radius (parallel).
   Eigen::Vector3f center1, center2, center3;
   cv::Mat         debug_img1, debug_img2, debug_img3;
-  fitEachSegment(seg1, (x1min + x1max) / 2.0, center1, debug_img1);
-  fitEachSegment(seg2, (x2min + x2max) / 2.0, center2, debug_img2);
+  auto            f1 = std::async(std::launch::async, [&] {
+    fitEachSegment(seg1, (x1min + x1max) / 2.0, center1, debug_img1);
+  });
+  auto            f2 = std::async(std::launch::async, [&] {
+    fitEachSegment(seg2, (x2min + x2max) / 2.0, center2, debug_img2);
+  });
   fitEachSegment(seg3, (x3min + x3max) / 2.0, center3, debug_img3);
+  f1.wait();
+  f2.wait();
 
   // 8. Compute second order difference for this frame.
   Eigen::Vector2f m1 = center1.segment<2>(1);
@@ -330,6 +320,14 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   Eigen::Vector2f ms = (m3 - 2 * m2 + m1) / (d * d);
 
   Eigen::Vector3f ms_3d(center2.x(), ms.x(), ms.y());
+
+  RCLCPP_INFO(get_logger(),
+              "Frame curvature: (%.3f, %.3f), center2: (%.3f, %.3f, %.3f)",
+              ms.x(),
+              ms.y(),
+              center2.x(),
+              center2.y(),
+              center2.z());
 
   // 9. transform the 2-diff data to tube frame.
   Eigen::Matrix3f R_pca = transform.block<3, 3>(0, 0);
@@ -341,14 +339,43 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   Eigen::Vector3f ms_tube = world_to_tube_f.linear() * ms_world;
 
   float pos_tube_x = (world_to_tube_f * (R_pca.transpose() * center2)).x();
-  int bin_idx = static_cast<int>(
-      std::floor(pos_tube_x / params_.integral_process_.bin_length));
-  auto& [sum, count] = diff_bins_[bin_idx];
-  sum += Eigen::Vector3f(pos_tube_x, ms_tube.y(), ms_tube.z());
-  count++;
 
-  if (!diff_bins_.empty())
-    integralProcess(diff_bins_, center_points_);
+  // Absolute center position in tube frame (y, z only)
+  Eigen::Vector3f center2_tube =
+      world_to_tube_f * (R_pca.transpose() * center2);
+
+  RCLCPP_INFO(get_logger(),
+              "(%.3f, %.3f, %.3f)",
+              center2_tube.x(),
+              ms_tube.y(),
+              ms_tube.z());
+
+  // Reject outlier curvature values (threshold: 10 m^-2)
+  if (std::abs(ms_tube.y()) > 10.0f || std::abs(ms_tube.z()) > 10.0f)
+  {
+    RCLCPP_WARN(get_logger(),
+                "Outlier curvature rejected: (%.3f, %.3f)",
+                ms_tube.y(),
+                ms_tube.z());
+  }
+  else
+  {
+    int bin_idx = static_cast<int>(
+        std::floor(pos_tube_x / params_.integral_process_.bin_length));
+    {
+      auto& [sum, count] = diff_bins_[bin_idx];
+      sum += Eigen::Vector3f(pos_tube_x, ms_tube.y(), ms_tube.z());
+      count++;
+    }
+    {
+      auto& [sum, count] = abs_bins_[bin_idx];
+      sum += Eigen::Vector3f(pos_tube_x, center2_tube.y(), center2_tube.z());
+      count++;
+    }
+  }
+
+  //   if (!diff_bins_.empty())
+  //     integralProcess(diff_bins_, abs_bins_, center_points_);
 
   // 11. Draw circle fitting results for each segment (DEBUG)
   cv::putText(debug_img1,
@@ -384,34 +411,35 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   debug_img_pub_->publish(*img_msg);
 
   // Publish centerline marker
-  if (!center_points_.empty())
-  {
-    Eigen::Affine3f tube_to_world = world_to_tube_f.inverse();
+  //   if (!center_points_.empty())
+  //   {
+  //     Eigen::Affine3f tube_to_world = world_to_tube_f.inverse();
 
-    visualization_msgs::msg::Marker marker;
-    marker.header.stamp    = pc1->header.stamp;
-    marker.header.frame_id = params_.frames_.world_frame;
-    marker.type            = visualization_msgs::msg::Marker::LINE_STRIP;
-    marker.action          = visualization_msgs::msg::Marker::ADD;
-    marker.scale.x         = 0.01;
-    marker.color.r         = 1.0f;
-    marker.color.a         = 1.0f;
-    for (const auto& pt : center_points_)
-    {
-      Eigen::Vector3f pw = tube_to_world * pt;
-      geometry_msgs::msg::Point p;
-      p.x = pw.x();
-      p.y = pw.y();
-      p.z = pw.z();
-      marker.points.push_back(p);
-    }
-    RCLCPP_INFO(get_logger(), "Marker points: %zu, first: (%.3f, %.3f, %.3f)",
-                marker.points.size(),
-                marker.points.empty() ? 0.0 : marker.points.front().x,
-                marker.points.empty() ? 0.0 : marker.points.front().y,
-                marker.points.empty() ? 0.0 : marker.points.front().z);
-    centerline_pub_->publish(marker);
-  }
+  //     visualization_msgs::msg::Marker marker;
+  //     marker.header.stamp = pc1->header.stamp;
+  //     marker.header.frame_id = params_.frames_.world_frame;
+  //     marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+  //     marker.action = visualization_msgs::msg::Marker::ADD;
+  //     marker.scale.x = 0.01;
+  //     marker.color.r = 1.0f;
+  //     marker.color.a = 1.0f;
+  //     for (const auto& pt : center_points_)
+  //     {
+  //       Eigen::Vector3f           pw = tube_to_world * pt;
+  //       geometry_msgs::msg::Point p;
+  //       p.x = pw.x();
+  //       p.y = pw.y();
+  //       p.z = pw.z();
+  //       marker.points.push_back(p);
+  //     }
+  //     RCLCPP_INFO(get_logger(),
+  //                 "Marker points: %zu, first: (%.3f, %.3f, %.3f)",
+  //                 marker.points.size(),
+  //                 marker.points.empty() ? 0.0 : marker.points.front().x,
+  //                 marker.points.empty() ? 0.0 : marker.points.front().y,
+  //                 marker.points.empty() ? 0.0 : marker.points.front().z);
+  //     centerline_pub_->publish(marker);
+  //   }
 }
 } // namespace tsm
 

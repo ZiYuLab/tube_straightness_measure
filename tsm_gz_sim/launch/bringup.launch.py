@@ -1,30 +1,25 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 
-def generate_launch_description():
+def launch_setup(context, *args, **kwargs):
     pkg = get_package_share_directory('tsm_gz_sim')
     world_sdf = os.path.join(pkg, 'sdf', 'measure_world.sdf')
-    tube_sdf = os.path.join(pkg, 'sdf', 'straight_tube', 'straight_tube.sdf')
     default_params = os.path.join(pkg, 'config', 'sim_config.yaml')
 
-    declare_tube_type_cmd = DeclareLaunchArgument(
-        'tube_type',
-        default_value='straight',
-        description='Type of tube to measure',
-    )
-    declare_params_cmd = DeclareLaunchArgument(
-        'params_file',
-        default_value=default_params,
-        description='Path to tsw_gz_sim_node parameters yaml',
-    )
+    tube_type = LaunchConfiguration('tube_type').perform(context)
+    if tube_type == 'bend':
+        tube_sdf  = os.path.join(pkg, 'sdf', 'bend_tube', 'bend_tube.sdf')
+        tube_name = 'bend_tube'
+    else:
+        tube_sdf  = os.path.join(pkg, 'sdf', 'straight_tube', 'straight_tube.sdf')
+        tube_name = 'straight_tube'
 
-    # 启动 Gazebo Harmonic
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -35,29 +30,27 @@ def generate_launch_description():
         launch_arguments={'gz_args': f'-r {world_sdf}'}.items(),
     )
 
-    # 生成钢管模型
     spawn_tube = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
             '-world', 'measure_world',
-            '-name', 'straight_tube',
+            '-name', tube_name,
             '-file', tube_sdf,
-            ],
-            output='screen',
-        )
+        ],
+        output='screen',
+    )
 
     ros_gz_bridge = Node(
-            package='ros_gz_bridge',
-            executable='parameter_bridge',
-            parameters=[
-                {'config_file': os.path.join(pkg, 'config', 'topic_bridge_config.yaml')},
-                {'use_sim_time': True},
-            ],
-            output='screen',
-        )
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        parameters=[
+            {'config_file': os.path.join(pkg, 'config', 'topic_bridge_config.yaml')},
+            {'use_sim_time': True},
+        ],
+        output='screen',
+    )
 
-    # x y z yaw pitch roll parent child
     tf_rgbd_1 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -82,18 +75,26 @@ def generate_launch_description():
     tsm_gz_sim = Node(
         package='tsm_gz_sim',
         executable='tsm_gz_sim_node',
-        parameters=[LaunchConfiguration('params_file')],
+        parameters=[
+            LaunchConfiguration('params_file'),
+            {'tube_model_name': tube_name},
+        ],
         output='screen',
     )
 
-    ld = LaunchDescription()
-    ld.add_action(declare_tube_type_cmd)
-    ld.add_action(declare_params_cmd)
-    ld.add_action(gazebo)
-    ld.add_action(spawn_tube)
-    ld.add_action(ros_gz_bridge)
-    ld.add_action(tf_rgbd_1)
-    ld.add_action(tf_rgbd_2)
-    ld.add_action(rviz)
-    ld.add_action(tsm_gz_sim)
-    return ld
+    return [gazebo, spawn_tube, ros_gz_bridge, tf_rgbd_1, tf_rgbd_2, rviz, tsm_gz_sim]
+
+
+def generate_launch_description():
+    pkg = get_package_share_directory('tsm_gz_sim')
+    default_params = os.path.join(pkg, 'config', 'sim_config.yaml')
+
+    return LaunchDescription([
+        SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH',
+                               os.path.join(pkg, 'sdf')),
+        DeclareLaunchArgument('tube_type', default_value='straight',
+                              description='Type of tube: straight or bend'),
+        DeclareLaunchArgument('params_file', default_value=default_params,
+                              description='Path to tsm_gz_sim_node parameters yaml'),
+        OpaqueFunction(function=launch_setup),
+    ])

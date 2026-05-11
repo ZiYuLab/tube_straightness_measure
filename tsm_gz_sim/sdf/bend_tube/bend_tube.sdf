@@ -1,0 +1,32 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="bend_tube">
+    <static>false</static>
+
+    <link name="tube_link">
+      <gravity>false</gravity>
+      <kinematic>true</kinematic>
+      <visual name="tube_visual">
+        <geometry>
+          <mesh>
+            <uri>model://bend_tube/bend_tube.obj</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.5 0.5 0.5 1</ambient>
+          <diffuse>0.5 0.5 0.5 1</diffuse>
+          <specular>0.3 0.3 0.3 1</specular>
+        </material>
+      </visual>
+
+      <collision name="tube_collision">
+        <geometry>
+          <mesh>
+            <uri>model://bend_tube/bend_tube.obj</uri>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+
+  </model>
+</sdf>

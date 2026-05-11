@@ -111,25 +111,22 @@ void TsmNode::fitEachSegment(const PointCloudT::Ptr& seg,
       continue;
 
     // Count inliers
-    int                          inliers = 0;
-    std::vector<Eigen::Vector2f> inlier_pts;
+    int inliers = 0;
     for (const auto& pt : points_2d)
     {
-      float dist = std::abs((pt - center).norm() - radius);
-      if (dist < params_.cutting_fittting_.ransac_distance_threshold)
-      {
-        inlier_pts.push_back(pt);
+      if (std::abs((pt - center).norm() - radius) <
+          params_.cutting_fittting_.ransac_distance_threshold)
         ++inliers;
-      }
     }
 
     // Update best model
     if (inliers > best_inliers)
     {
-      best_inlier_pts = inlier_pts;
       best_inliers = inliers;
-      best_center = center;
-      best_radius = radius;
+      best_center  = center;
+      best_radius  = radius;
+      if (inliers > static_cast<int>(points_2d.size()) * 9 / 10)
+        break;
     }
   }
 
@@ -145,7 +142,7 @@ void TsmNode::fitEachSegment(const PointCloudT::Ptr& seg,
   // influence will be reduced.
   ceres::LossFunction* problem_loss_g = new ceres::HuberLoss(0.1);
 
-  for (const auto& pt : best_inlier_pts)
+  for (const auto& pt : points_2d)
   {
     problem_g.AddResidualBlock(
         new ceres::AutoDiffCostFunction<CircleFittingResidual, 1, 2, 1>(
@@ -159,7 +156,7 @@ void TsmNode::fitEachSegment(const PointCloudT::Ptr& seg,
   ceres::Solver::Options options_g;
   options_g.linear_solver_type = ceres::DENSE_QR;
   options_g.minimizer_progress_to_stdout = false;
-  options_g.max_num_iterations = 50;
+  options_g.max_num_iterations = 20;
   ceres::Solver::Summary summary_g;
   ceres::Solve(options_g, &problem_g, &summary_g);
 

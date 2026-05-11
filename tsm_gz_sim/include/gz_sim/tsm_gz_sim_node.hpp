@@ -39,6 +39,9 @@ private:
   double x_end_{0.5};
   double x_start_{-0.5};
   double dt_s_{0.001};
+  double vib_amplitude_{0.002};
+  double vib_frequency_{1.0};
+  double elapsed_s_{0.0};
   int direction_{0};
   std::string tf_frame_id_{"world"};
   std::string tf_child_frame_id_{"tube"};
