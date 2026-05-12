@@ -18,8 +18,9 @@ ament_auto_find_build_dependencies()
 ament_auto_add_library(${PROJECT_NAME} SHARED
   src/tsm_node.cpp
   src/fit_each_segment.cpp
-  src/integral_process.cpp
-  src/kalman_smoother.cpp
+  src/integrator.cpp
+  src/wls.cpp
+  src/post_process.cpp
 )
 target_include_directories(${PROJECT_NAME} PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} Ceres::ceres
@@ -33,4 +34,5 @@ ament_auto_package(
   USE_SCOPED_HEADER_INSTALL_DIR
   INSTALL_TO_SHARE
   config 
+  launch
 )

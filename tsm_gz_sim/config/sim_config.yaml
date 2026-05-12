@@ -8,3 +8,10 @@ tsm_gz_sim_node:
     tube_model_name: straight_tube
     tf_frame_id: world
     tf_child_frame_id: tube
+    # Noise 1: translational vibration (yz direction, zero-mean)
+    vib_amplitude: 0.01   # m
+    vib_frequency: 0.5     # Hz
+    # Noise 2: static tilt + angular vibration around z-axis
+    tilt_angle: 0.01           # rad (~0.57 deg static tilt)
+    tilt_vib_amplitude: 0.005  # rad angular vibration amplitude
+    tilt_vib_frequency: 0.5    # Hz

@@ -17,7 +17,6 @@
 #include <random>
 
 #include "tsm/tsm_node.hpp"
-#include "Eigen/src/Core/Matrix.h"
 #include "ceres/ceres.h"
 
 namespace tsm
@@ -163,6 +162,15 @@ void TsmNode::fitEachSegment(const PointCloudT::Ptr& seg,
   center.y() = center_yz[0];
   center.z() = center_yz[1];
   center.x() = center_x;
+
+  if (params_.cutting_fittting_.measurement_noise_sigma > 0.0)
+  {
+    thread_local std::mt19937                      rng_n{std::random_device{}()};
+    std::normal_distribution<float> noise(
+        0.0f, params_.cutting_fittting_.measurement_noise_sigma);
+    center.y() += noise(rng_n);
+    center.z() += noise(rng_n);
+  }
   auto res_radius = radius[0];
 
   // 4. Draw the results on debug image

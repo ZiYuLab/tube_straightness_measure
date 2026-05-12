@@ -85,10 +85,18 @@ void TsmNode::setupParams()
       declare_parameter<int>("cutting_fittting.ransac_max_iterations", 100);
   params_.cutting_fittting_.min_points_in_segment =
       declare_parameter<int>("cutting_fittting.min_points_in_segment", 200);
+  params_.cutting_fittting_.measurement_noise_sigma = declare_parameter<double>(
+      "cutting_fittting.measurement_noise_sigma", 0.0);
 
   params_.integral_process_.bin_length = declare_parameter<double>(
       "integral_process.bin_length",
       params_.cutting_fittting_.length_of_each_segment);
+  params_.integral_process_.w_kappa =
+      declare_parameter<double>("integral_process.w_kappa", 1.0);
+  params_.integral_process_.w_abs =
+      declare_parameter<double>("integral_process.w_abs", 0.1);
+  params_.integral_process_.lambda =
+      declare_parameter<double>("integral_process.lambda", 1e-4);
 }
 
 void TsmNode::setupTf()
@@ -120,14 +128,14 @@ void TsmNode::setupPub()
   seg3_pc_pub_ = create_publisher<PC2>(params_.topics_.seg3_pointcloud, 10);
   debug_img_pub_ = create_publisher<sensor_msgs::msg::Image>(
       params_.topics_.debug_image, 10);
-  centerline_pub_ = create_publisher<visualization_msgs::msg::Marker>(
+  centerline_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
       params_.topics_.centerline_marker, 10);
 }
 
 void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
                             const PC2::ConstSharedPtr& pc2)
 {
-  RCLCPP_INFO(get_logger(), "Received synced PointClouds");
+  auto start_time = std::chrono::steady_clock::now();
 
   // Search TF from world to tube
   auto                                 stamp = pc1->header.stamp;
@@ -174,8 +182,8 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   PointCloudT::Ptr merged(new PointCloudT);
   {
     PointCloudT::Ptr c1(new PointCloudT), c2(new PointCloudT);
-    auto f = std::async(std::launch::async,
-                        [&] { pcl::fromROSMsg(*pc2, *c2); });
+    auto             f =
+        std::async(std::launch::async, [&] { pcl::fromROSMsg(*pc2, *c2); });
     pcl::fromROSMsg(*pc1, *c1);
     f.wait();
     pcl::transformPointCloud(*c1, *c1, transform_rgbd1_);
@@ -185,15 +193,20 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
 
   // 2. Cut the merged point cloud to a box area around the tube.
   {
-    float xmin = params_.valid_pc_area_.x_min, xmax = params_.valid_pc_area_.x_max;
-    float ymin = params_.valid_pc_area_.y_min, ymax = params_.valid_pc_area_.y_max;
-    float zmin = params_.valid_pc_area_.z_min, zmax = params_.valid_pc_area_.z_max;
-    merged->erase(
-        std::remove_if(merged->begin(), merged->end(), [&](const PointT& p) {
-          return p.x < xmin || p.x > xmax || p.y < ymin || p.y > ymax ||
-                 p.z < zmin || p.z > zmax;
-        }),
-        merged->end());
+    float xmin = params_.valid_pc_area_.x_min,
+          xmax = params_.valid_pc_area_.x_max;
+    float ymin = params_.valid_pc_area_.y_min,
+          ymax = params_.valid_pc_area_.y_max;
+    float zmin = params_.valid_pc_area_.z_min,
+          zmax = params_.valid_pc_area_.z_max;
+    merged->erase(std::remove_if(merged->begin(),
+                                 merged->end(),
+                                 [&](const PointT& p) {
+                                   return p.x < xmin || p.x > xmax ||
+                                          p.y < ymin || p.y > ymax ||
+                                          p.z < zmin || p.z > zmax;
+                                 }),
+                  merged->end());
   }
 
   // 3. Sent merged and filter result to ros2 (DEBUG)
@@ -321,34 +334,23 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
 
   Eigen::Vector3f ms_3d(center2.x(), ms.x(), ms.y());
 
-  RCLCPP_INFO(get_logger(),
-              "Frame curvature: (%.3f, %.3f), center2: (%.3f, %.3f, %.3f)",
-              ms.x(),
-              ms.y(),
-              center2.x(),
-              center2.y(),
-              center2.z());
-
   // 9. transform the 2-diff data to tube frame.
   Eigen::Matrix3f R_pca = transform.block<3, 3>(0, 0);
-  Eigen::Affine3f world_to_tube_f =
-      tf2::transformToEigen(world_to_tube.transform).cast<float>();
+  const float     tube_world_x = world_to_tube.transform.translation.x;
 
   Eigen::Vector3f ms_world =
       R_pca.transpose() * Eigen::Vector3f(0, ms.x(), ms.y());
-  Eigen::Vector3f ms_tube = world_to_tube_f.linear() * ms_world;
+  Eigen::Vector3f& ms_tube = ms_world;
 
-  float pos_tube_x = (world_to_tube_f * (R_pca.transpose() * center2)).x();
+  //   const float pos_tube_x = center2_world.x() - tube_world_x;
+  const float pos_tube_x = center2.x() - tube_world_x;
 
-  // Absolute center position in tube frame (y, z only)
-  Eigen::Vector3f center2_tube =
-      world_to_tube_f * (R_pca.transpose() * center2);
+  // Absolute center position: x uses tube displacement, y/z keep PCA-corrected
+  // lateral offsets.
+  Eigen::Vector3f center2_tube(pos_tube_x, center2.y(), center2.z());
 
-  RCLCPP_INFO(get_logger(),
-              "(%.3f, %.3f, %.3f)",
-              center2_tube.x(),
-              ms_tube.y(),
-              ms_tube.z());
+  const int bin_idx = static_cast<int>(
+      std::floor(pos_tube_x / params_.integral_process_.bin_length));
 
   // Reject outlier curvature values (threshold: 10 m^-2)
   if (std::abs(ms_tube.y()) > 10.0f || std::abs(ms_tube.z()) > 10.0f)
@@ -360,87 +362,43 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   }
   else
   {
-    int bin_idx = static_cast<int>(
-        std::floor(pos_tube_x / params_.integral_process_.bin_length));
     {
-      auto& [sum, count] = diff_bins_[bin_idx];
-      sum += Eigen::Vector3f(pos_tube_x, ms_tube.y(), ms_tube.z());
-      count++;
+      // Second order difference
+      auto&           bd = diff_bins_.emplace(bin_idx, BinData{}).first->second;
+      Eigen::Vector3f v(pos_tube_x, ms_tube.y(), ms_tube.z());
+      bd.sum += v;
+      bd.sum_sq += v.cwiseProduct(v);
+      bd.count++;
     }
     {
-      auto& [sum, count] = abs_bins_[bin_idx];
-      sum += Eigen::Vector3f(pos_tube_x, center2_tube.y(), center2_tube.z());
-      count++;
+      // Absolute center
+      auto&           bd = abs_bins_.emplace(bin_idx, BinData{}).first->second;
+      Eigen::Vector3f v(pos_tube_x, center2_tube.y(), center2_tube.z());
+      bd.sum += v;
+      bd.sum_sq += v.cwiseProduct(v);
+      bd.count++;
     }
   }
 
-  //   if (!diff_bins_.empty())
-  //     integralProcess(diff_bins_, abs_bins_, center_points_);
-
-  // 11. Draw circle fitting results for each segment (DEBUG)
-  cv::putText(debug_img1,
-              "seg1",
-              cv::Point(5, 15),
-              cv::FONT_HERSHEY_SIMPLEX,
-              0.5,
-              cv::Scalar(255, 255, 255),
-              1);
-  cv::putText(debug_img2,
-              "seg2",
-              cv::Point(5, 15),
-              cv::FONT_HERSHEY_SIMPLEX,
-              0.5,
-              cv::Scalar(255, 255, 255),
-              1);
-  cv::putText(debug_img3,
-              "seg3",
-              cv::Point(5, 15),
-              cv::FONT_HERSHEY_SIMPLEX,
-              0.5,
-              cv::Scalar(255, 255, 255),
-              1);
-
-  cv::Mat combined;
-  cv::hconcat(std::vector<cv::Mat>{debug_img1, debug_img2, debug_img3},
-              combined);
-
-  // Publish debug image
-  auto img_msg = cv_bridge::CvImage(std_msgs::msg::Header{}, "bgr8", combined)
-                     .toImageMsg();
-  img_msg->header.stamp = pc1->header.stamp;
-  debug_img_pub_->publish(*img_msg);
-
-  // Publish centerline marker
-  //   if (!center_points_.empty())
-  //   {
-  //     Eigen::Affine3f tube_to_world = world_to_tube_f.inverse();
-
-  //     visualization_msgs::msg::Marker marker;
-  //     marker.header.stamp = pc1->header.stamp;
-  //     marker.header.frame_id = params_.frames_.world_frame;
-  //     marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
-  //     marker.action = visualization_msgs::msg::Marker::ADD;
-  //     marker.scale.x = 0.01;
-  //     marker.color.r = 1.0f;
-  //     marker.color.a = 1.0f;
-  //     for (const auto& pt : center_points_)
-  //     {
-  //       Eigen::Vector3f           pw = tube_to_world * pt;
-  //       geometry_msgs::msg::Point p;
-  //       p.x = pw.x();
-  //       p.y = pw.y();
-  //       p.z = pw.z();
-  //       marker.points.push_back(p);
-  //     }
-  //     RCLCPP_INFO(get_logger(),
-  //                 "Marker points: %zu, first: (%.3f, %.3f, %.3f)",
-  //                 marker.points.size(),
-  //                 marker.points.empty() ? 0.0 : marker.points.front().x,
-  //                 marker.points.empty() ? 0.0 : marker.points.front().y,
-  //                 marker.points.empty() ? 0.0 : marker.points.front().z);
-  //     centerline_pub_->publish(marker);
-  //   }
+  // 10. Log stauts.
+  auto   end = std::chrono::steady_clock::now();
+  double t_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start_time)
+          .count();
+  const auto bin_it = diff_bins_.find(bin_idx);
+  const int  current_bin_count =
+      bin_it != diff_bins_.end() ? bin_it->second.count : 0;
+  RCLCPP_INFO(
+      get_logger(),
+      "tube_x: %.2f, bins: %zu, pts_in_bin: %d, scan_x: %.2f m, using: %.2f ms",
+      tube_world_x,
+      diff_bins_.size(),
+      current_bin_count,
+      pos_tube_x,
+      t_ms);
 }
+
+TsmNode::~TsmNode() { postProcess(); }
 } // namespace tsm
 
 RCLCPP_COMPONENTS_REGISTER_NODE(tsm::TsmNode)

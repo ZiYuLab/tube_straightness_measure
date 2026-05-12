@@ -1,0 +1,19 @@
+tsm_node:
+  ros__parameters:
+    cutting_fittting:
+      length_of_each_segment: 0.1
+      ransac_max_iterations: 100
+      ransac_distance_threshold: 0.005
+      min_points_in_segment: 200
+      # Noise 3: Gaussian measurement noise on circle center (m), 0.0 = disabled
+      measurement_noise_sigma: 0.0
+
+    integral_process:
+      bin_length: 0.1
+      w_kappa: 100.0    # curvature term weight
+      w_abs: 1.0      # absolute position term weight
+      lambda: 0.0001  # smoothness regularization
+
+# Noise 2: camera installation y-axis bias
+# Set via launch argument: camera_y_bias (default 0.0 m)
+# Example: ros2 launch tsm_gz_sim bringup.launch.py camera_y_bias:=0.05

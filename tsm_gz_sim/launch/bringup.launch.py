@@ -51,16 +51,18 @@ def launch_setup(context, *args, **kwargs):
         output='screen',
     )
 
+    camera_y_bias = float(LaunchConfiguration('camera_y_bias').perform(context))
+
     tf_rgbd_1 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0', '1.0', '1.0', '-1.5708', '0.7854', '0', 'world', 'rgbd_1/camera_link/rgbd_1'],
+        arguments=['0', str(1.0 + camera_y_bias), '1.0', '-1.5708', '0.7854', '0', 'world', 'rgbd_1/camera_link/rgbd_1'],
         parameters=[{'use_sim_time': True}],
     )
     tf_rgbd_2 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0', '-1.0', '1.0', '1.5708', '0.7854', '0', 'world', 'rgbd_2/camera_link/rgbd_2'],
+        arguments=['0', str(-1.0 + camera_y_bias), '1.0', '1.5708', '0.7854', '0', 'world', 'rgbd_2/camera_link/rgbd_2'],
         parameters=[{'use_sim_time': True}],
     )
 
@@ -96,5 +98,7 @@ def generate_launch_description():
                               description='Type of tube: straight or bend'),
         DeclareLaunchArgument('params_file', default_value=default_params,
                               description='Path to tsm_gz_sim_node parameters yaml'),
+        DeclareLaunchArgument('camera_y_bias', default_value='0.0',
+                              description='Camera installation y-axis bias (m)'),
         OpaqueFunction(function=launch_setup),
     ])
