@@ -16,9 +16,9 @@ plt.rcParams["axes.unicode_minus"] = False
 
 # ================= 数据文件与配置 =================
 files = [
-    {"path": "abs_track.csv", "name": "ABS 轨迹", "color": "#1f77b4"},
-    {"path": "integrator_track.csv", "name": "Integrator 轨迹", "color": "#ff7f0e"},
-    {"path": "wls_track.csv", "name": "WLS 轨迹", "color": "#2ca02c"},
+    {"path": "abs_track.csv", "name": "绝对坐标测量", "color": "#1f77b4"},
+    {"path": "integrator_track.csv", "name": "本方法", "color": "#ff7f0e"},
+    # {"path": "wls_track.csv", "name": "WLS 轨迹", "color": "#2ca02c"},
 ]
 
 fig, ax = plt.subplots(figsize=(12, 6))
@@ -28,8 +28,8 @@ max_x_overall = 0
 # 遍历绘制每一条测量曲线
 for file_info in files:
     df = pd.read_csv(file_info["path"])
-    x = df["x"]
-    y = df["distance"]
+    x = df["u"]
+    y = df["dist"]
 
     # 更新全局最大 X 跨度 (用于确定实际弦长)
     current_max_x = x.max()
