@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <fstream>
 #include <gz/transport/Node.hh>
 
 #include "rclcpp/rclcpp.hpp"
@@ -47,6 +48,7 @@ private:
   double drift_z_{0.0};             // z drift per full stroke (m)
   double drift_angle_{0.0};         // angle drift per full stroke (rad)
   double elapsed_s_{0.0};
+  std::ofstream pose_log_;
   int direction_{0};
   std::string tf_frame_id_{"world"};
   std::string tf_child_frame_id_{"tube"};

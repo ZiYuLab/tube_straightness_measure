@@ -61,6 +61,11 @@
               <format>RGB_INT8</format>
             </image>
             <clip><near>0.1</near><far>2.0</far></clip>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.002</stddev>
+            </noise>
             <depth_camera>
               <clip><near>0.1</near><far>2.0</far></clip>
             </depth_camera>
@@ -94,6 +99,11 @@
               <format>RGB_INT8</format>
             </image>
             <clip><near>0.1</near><far>2.0</far></clip>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.002</stddev>
+            </noise>
             <depth_camera>
               <clip><near>0.1</near><far>2.0</far></clip>
             </depth_camera>

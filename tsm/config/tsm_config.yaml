@@ -1,10 +1,10 @@
 tsm_node:
   ros__parameters:
     cutting_fittting:
-      length_of_each_segment: 0.005
+      length_of_each_segment: 0.01
       ransac_max_iterations: 100
       ransac_distance_threshold: 0.005
-      min_points_in_segment: 200
+      min_points_in_segment: 100
       # Noise 3: Gaussian measurement noise on circle center (m), 0.0 = disabled
       measurement_noise_sigma: 0.0
 

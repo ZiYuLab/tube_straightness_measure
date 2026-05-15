@@ -113,7 +113,7 @@ private:
     struct
     {
       // Minimum points
-      int min_points_in_segment = 200;
+      int min_points_in_segment = 100;
 
       // Each segment will be how long along the tube axis.
       double length_of_each_segment = 0.1;

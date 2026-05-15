@@ -341,9 +341,15 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   const int   bin_idx = static_cast<int>(
       std::floor(pos_tube_x / params_.integral_process_.bin_length));
 
-  if (kappa > 10.0f)
+  const bool pos_outlier =
+      std::abs(c2_w.y()) > params_.valid_pc_area_.y_max ||
+      std::abs(c2_w.z()) > params_.valid_pc_area_.z_max;
+
+  if (kappa > 10.0f || pos_outlier)
   {
-    RCLCPP_WARN(get_logger(), "Outlier curvature rejected: %.3f", kappa);
+    RCLCPP_WARN(get_logger(),
+                "Outlier rejected: kappa=%.3f y=%.3f z=%.3f",
+                kappa, c2_w.y(), c2_w.z());
   }
   else
   {
