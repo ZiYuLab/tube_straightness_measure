@@ -25,7 +25,6 @@
 \usepackage{pdfpages}
 \setlength{\parindent}{2em} % 全局缩进设为 2em
 
-% 将引用改为右上角显示
 \let\oldcite\cite
 \renewcommand{\cite}[1]{\textsuperscript{\oldcite{#1}}}
 
@@ -64,8 +63,8 @@
 在石油天然气输送、航空航天以及汽车零部件制造等领域得到了广泛应用。然而，钢管的直线度偏差可能会带来一系列问题，例如装配困难、
 应力集中或流体阻力增加等，这些问题不仅会降低产品的可靠性，还可能缩短其使用寿命。
 
-目前已知国内外钢管圆度检测方法主要分为两大类，分别是接触式测量和非接触测量。
-传统方法中，采用用拉线法与直尺法，工人通过拉线或直尺直接接触钢管表面，肉眼判断直线度偏差。
+目前已知国内外钢管直度检测方法主要分为两大类，分别是接触式测量和非接触测量。
+传统方法中，采用拉线法与直尺法，工人通过拉线或直尺直接接触钢管表面，肉眼判断直线度偏差。
 其优点是操作简单、成本低，但效率低下且精度受主观因素影响，难以满足大规模生产需求。
 使用三坐标测量机对钢管进行多点接触式测量，精度较高，但需逐点检测，耗时较长，且设备昂贵，仅适用于实验室或小批量抽检场景。
 部分生产线通过校直机的机械接触反馈间接判断直线度，但这类方法需依赖后续加工效果，无法实现实时检测，且可能因过度校直损伤钢管。
@@ -78,10 +77,9 @@
 非接触式检测设备正与工业物联网（IIoT）融合，实现检测数据实时分析及工艺优化反馈，推动质量控制的闭环管理。如激光与视觉技术的结合，
 可兼顾高速与高精度检测需求。随着传感器技术发展，非接触式设备的成本逐步降低，未来有望在中小型企业普及。
 
-
-早在2001年便有提到一种基于机器视觉的钢管直度检测方案\cite{cv}，然而该方案受限于视觉传感器的像素精度。
-2002年Wei Gao团队提到了一种使用三对单点激光测距进行钢管直度检测的方案，使用了差分积分法能够有效消除由于传感器安装位置导致的误差，
-并且提出了一种传感器调零校准的方案\cite{pm}。但是单点测距的范围较小，且基于检测钢管外轮廓的方案难以避免由于钢管左右扭动或运动偏心造成的误差。 
+早在2001年便有研究提出一种基于机器视觉的钢管直度检测方案\cite{cv}，然而该方案受限于视觉传感器的像素精度。
+2002年Wei Gao团队提出了一种使用三对单点激光测距进行钢管直度检测的方案，使用了差分积分法能够有效消除由于传感器安装位置导致的误差，
+并且提出了一种传感器调零校准的方案\cite{pm}。但是单点测距的范围较小，误差的消除方法也仅适用于二维平面测量，无法处理三维旋转和平移误差。 
 2003年，来自天津大学的吴有华等人发明出一款钢管直度测量视觉传感器，采用双光条结构提高圆心定位精度， 优化传感器设计，这种标定方法简单高效，
 悬丝法比传统齿形靶标定更方便，精度相当。缺点是容易受到设备限制，标定依赖经纬仪等辅助工具，增加操作复杂度，适用范围较窄，主要针对钢管，
 未提及其他形状的适用性。  
@@ -93,8 +91,9 @@
 并且依赖小车速度，适用范围窄，仅针对直缝钢管焊缝方向的弯曲，未涵盖全方位变形检测。
 随后，在2018年，南通盛立德金属材料科技有限公司的杭伟发明了一种新的钢管直线度检测器。该设备利用线性弹簧隔振和柔性连轴器技术，
 能够适应不同规格钢管的检测需求，展现出较广的应用范围。不过，这一方法仅适用于旋转检测，无法检测静态变形，因此存在一定的局限性。
-到了2020年，宝山钢铁有限公司的张建伟团队将非接触式激光测量与全周旋转技术相结合，显著提升了钢管管端直线度误差的测量精度和效率。
-这种技术能够很好地满足现代化生产的高要求，但其高昂的设备成本和复杂的数据处理流程可能限制其在某些场景下的应用推广。
+2021年Kshaurad等人利用了相机并采用了最小区域公差算法用于钢管圆度的测量\cite{cv_yd}；
+随后在2023年Andrea Egidi等人采用了一种基于机械调制的激光检测方法来测量钢管直度\cite{tzzxd}，然而该方法仅能测量局部直线度，无法获取全管段的整体弯曲信息。
+
 
 为降低成本、提升精度，本文提出一种基于双RGBD相机点云数据的大直径钢管直度在线测量算法。该算法以两台Intel D435 RGBD相机采集的点云及传送带位置传感器数据为输入，通过点云拼接与预处理获取高质量钢管局部点云，利用PCA估计轴线方向并进行截面切片，采用RANSAC粗拟合结合非线性最小二乘细拟合确定各截面圆心坐标。通过二阶差分法消除传感器安装误差与钢管刚体运动引入的旋转平移误差，有效抑制钢管轴向进给过程中位移抖动对测量精度的影响。在此基础上，利用分Bin平均降低随机测量噪声，再经加权PCA降维与两次数值积分重建钢管轴线偏差曲线，最终计算直度。我们搭建了基于铝型材框架与伺服电机直线模组的微缩测试平台，验证了点云分割算法的有效性，为后续算法验证提供了稳定的数据来源。
 
@@ -109,7 +108,7 @@
     \label{fig:overview}
 \end{figure}
 
-系统总览如图\ref{fig:overview}所示。整个系统的传感器部分为两个RGBD相机输出的点云数据（包括其相对于世界坐标的变换），及传送带的位置传感器，用于检测钢管在传送带上的位置。一般情况下，我们只能知道钢管在传送系统（即世界坐标系）的轴线（$x$轴）的位置信息，此处我们仅需要该信息。关于算法部分，接收到的点云通过拼接和预处理，输出仅保留钢管区域的相机可视有效点云数据，然后对这段点云进行去旋转操作，以避免切片投影后的椭圆形2D点云对圆形拟合产生的影响，并随后进行三段点云切片。在圆形拟合部分，我们采用RANSAC粗拟合加最小二乘细拟合方案，以确保在两传感器无法完全覆盖钢管的前提下的圆形拟合精度。紧接着，我们根据位置传感器信息将得到的三段点云切片转换到世界坐标系中，得到圆形的绝对位置，并同时计算圆心处钢管的二阶差分数据（曲率）。在全部钢管扫描完成后，我们可以分bin将数据存入，并计算每bin的各数据均值从而降低噪声对精度的影响。紧接着，我们利用加权PCA得到钢管的主方向和弯曲主方向，将三维问题降低为二维问题，最后对二阶差分数据进行二段积分，从而得到钢管中心在钢管坐标系下的序列，进而得到直度。
+系统总览如图\ref{fig:overview}所示。整个系统的传感器部分为两个RGBD相机输出的点云数据（包括其相对于世界坐标的变换），及传送带的位置传感器，用于检测钢管在传送带上的位置。一般情况下，我们只能知道钢管在传送系统（即世界坐标系）的轴线（$x$轴）的位置信息，此处我们仅需要该信息。关于算法部分，接收到的点云通过拼接和预处理，输出仅保留钢管区域的相机可视有效点云数据，然后对这段点云进行去旋转操作，以避免切片投影后的椭圆形2D点云对圆形拟合产生的影响，并随后进行三段点云切片。在圆形拟合部分，我们采用RANSAC粗拟合加最小二乘细拟合方案，以确保在两传感器无法完全覆盖钢管的前提下的圆形拟合精度。紧接着，我们根据位置传感器信息将得到的三段点云切片转换到世界坐标系中，得到圆形的绝对位置，并同时计算圆心处钢管的二阶差分数据（曲率）。在全部钢管扫描完成后，我们可以分bin将数据存入，并计算每bin的各数据均值从而降低噪声对精度的影响。紧接着，我们利用加权PCA得到钢管的主方向和弯曲主方向，将三维问题降低为二维问题，最后对二阶差分数据进行两次积分，从而得到钢管中心在钢管坐标系下的序列，进而得到直度。
 
 \subsection{坐标系定义}
 
@@ -123,7 +122,7 @@
 为了便于描述和计算，我们定义坐标系如图\ref{fig:frame_def}所示，各坐标系解释如下：
 
 \begin{itemize}
-    \item RGBD相机坐标系（$R_1$、$R_2$）：$x$为相机光轴方向，$y$轴为相平面长边方向。
+    \item RGBD相机坐标系（$R_1$、$R_2$）：$x$轴为相机光轴方向，$y$轴为像平面长边方向。
     \item 世界坐标系（$W$）：$x$为传送带正向，$z$为正向上。
     \item 钢管坐标系（$T$）：$x$轴为钢管两侧圆心连线，与$W$系$x$轴正向呈锐角，$z$轴为正向上。
 \end{itemize}
@@ -171,7 +170,7 @@
 
 经上述步骤处理，我们便可以得到质量较高、分布均匀、没有背景物体的钢管局部点云数据。考虑到实际应用中直度多为毫米级，因而此局部点云片段可近似看作标准圆柱体。然而由于钢管在传送系统运送时，局部可能不平行于世界坐标系的$x$轴，因此直接将可见范围点云切分将会得到椭圆形切片，从而降低精度。因此，可以使用PCA方法，找到当前局部点云的真实轴线方向，并以该方向切分点云。
 
-由于RGBD相机的可见局部点云，点沿轴线方向的散布远大于横截面方向的散布，因此最大方差方向必为轴线方向。寻找真实轴线问题转换为寻找一组三维正交基$\{\mathbf{e}_1, \mathbf{e}_2, \mathbf{e}_3\}$使得点云数据在这些正交基上的投影方差依次达到最大，这等价于对局部点云进行主成分分析（PCA）。
+由于RGBD相机的可见局部点云，点沿轴线方向的散布远大于横截面方向的散布，因此最大方差方向必为轴线方向。寻找真实轴线问题转换为寻找一组三维正交基$\{\mathbf{e}_1, \mathbf{e}_2, \mathbf{e}_3\}$使得点云数据在这些正交基上的投影方差依次达到最大，这等价于对局部点云进行主成分分析（PCA）\cite{pca}。
 
 首先对点云去中心化：
 \begin{equation}
@@ -200,7 +199,7 @@
 
 基于此，可以得到当前局部坐标系（PCA系）与世界坐标系中点的旋转变换关系：
 \begin{equation}
-    \mathbf{q}_i' = {}^W_{PCA}R \; \mathbf{q}_i = [\mathbf{e}_1, \mathbf{e}_2, \mathbf{e}_3] \mathbf{q}_i
+    \mathbf{q}_i' = {}^{PCA}_W R \; \mathbf{q}_i = [\mathbf{e}_1, \mathbf{e}_2, \mathbf{e}_3]^\top \mathbf{q}_i
 \end{equation}
 
 以有效范围中心为中心，设定片段厚度和切片步长，以$x'$为轴对有效范围的钢管点云进行切片，从而得到三个点云片段（$i = 1, 2, 3$）和其对应$x'$轴上的片段中心点${}^{PCA}\mathbf{p}_{ci}$的$x'$轴分量，如图\ref{fig:cutting}所示。
@@ -216,7 +215,7 @@
 
 为计算二阶差分，我们需要分别得到三段点云片段几何中心${}^W\mathbf{p}_{ci}$的坐标。若能得到切割片段几何中心${}^{PCA}\mathbf{p}_{ci}$的坐标，并基于上节得到的旋转矩阵，即可计算得到${}^W\mathbf{p}_{ci}$：
 \begin{equation}
-    {}^W\mathbf{p}_{ci} = {}^W_{PCA}R^\top \; {}^{PCA}\mathbf{p}_{ci}
+    {}^W\mathbf{p}_{ci} = {}^{PCA}_W R^\top \; {}^{PCA}\mathbf{p}_{ci}
 \end{equation}
 
 由于切割步长和片段厚度已知，因此可以得到${}^{PCA}\mathbf{p}_{ci}$的$x$分量，于是只需得到其$y$-$z$分量即可，问题简化为一个二维圆形拟合问题。
@@ -245,7 +244,7 @@
 
 \subsubsection{RANSAC 粗拟合}
 
-RANSAC的作用是从含有离群点的点集中，快速估计一个较可靠的圆初值。每次迭代随机选择三个非共线点 $\mathbf{p}_a,\ \mathbf{p}_b,\ \mathbf{p}_c$，三点唯一确定一个候选圆 $\hat{\mathbf{c}},\ \hat{r}$。对所有点计算候选模型残差，若残差小于阈值 $\tau$，则该点被认为是内点：
+RANSAC的作用是从含有离群点的点集中，快速估计一个较可靠的圆初值\cite{ransac}。每次迭代随机选择三个非共线点 $\mathbf{p}_a,\ \mathbf{p}_b,\ \mathbf{p}_c$，三点唯一确定一个候选圆 $\hat{\mathbf{c}},\ \hat{r}$。对所有点计算候选模型残差，若残差小于阈值 $\tau$，则该点被认为是内点：
 \begin{equation}
     \hat{e}_i = \left| \left\| \mathbf{p}_i - \hat{\mathbf{c}} \right\|_2 - \hat{r} \right| < \tau
 \end{equation}
@@ -291,7 +290,7 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
 
 采用ceres-solver求解上述问题，优化收敛后得到最终圆心 $\mathbf{c}^{*} = [y_c^{*}, z_c^{*}]^\top$。设已知${}^{PCA}\mathbf{p}_{ci}$的$x$分量为$x_c^*$，则最终得到：
 \begin{equation}
-    {}^W\mathbf{p}_{ci} = {}^W_{PCA}R^\top
+    {}^W\mathbf{p}_{ci} = {}^{PCA}_W R^\top
     \begin{bmatrix} x_c^* \\ y_c^* \\ z_c^* \end{bmatrix}
 \end{equation}
 
@@ -314,7 +313,7 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
     \Delta^2 \mathbf{p}'_i = \Delta \mathbf{p}'_{i+1} - \Delta \mathbf{p}'_i = \mathbf{R} \Delta^2 \mathbf{p}_i
 \end{equation}
 
-对上式求L2范数，便可以得到对应点消除了所有旋转平移误差的曲率：
+对上式求L2范数，便可以得到对应点消除了所有旋转平移误差的曲率近似值：
 \begin{equation}
     \kappa_{i+1} = \|\Delta^2 \mathbf{p}'_i\| = \|\Delta^2 \mathbf{p}_i\|
 \end{equation}
@@ -391,7 +390,7 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
     \mathbf{C} = \frac{1}{\sum_i M_i} \sum_{i=0}^{N-1} M_i\, \tilde{\mathbf{p}}_i \tilde{\mathbf{p}}_i^\top \in \mathbb{R}^{3\times 3}
 \end{equation}
 
-对$\mathbf{C}$做特征值分解，特征值排序$\lambda_1 \ge \lambda_2 \ge \lambda_3 \ge 0$，对应单位特征向量$\mathbf{e}_1, \mathbf{e}_2, \mathbf{e}_3$。其中$\mathbf{e}_1$为轴线方向，$\mathbf{e}_2$为主弯曲方向。
+对$\mathbf{C}$做特征值分解，特征值排序$\lambda_1 \ge \lambda_2 \ge \lambda_3 \ge 0$，对应单位特征向量$\mathbf{e}_1, \mathbf{e}_2, \mathbf{e}_3$\cite{wpca}。其中$\mathbf{e}_1$为轴线方向，$\mathbf{e}_2$为主弯曲方向。
 
 将各中心点投影至主弯曲平面$(\mathbf{e}_1, \mathbf{e}_2)$，并以第一个点为原点平移：
 \begin{equation}
@@ -405,6 +404,8 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
 由二阶差分法得到的曲率$\bar{\kappa}_i$为轴线二阶导数的幅值，即$\bar{\kappa}_i \approx |v''(u_i)|$。对其进行两次数值积分（梯形法则）可重建轴线偏差曲线。
 
 \textbf{第一次积分：曲率 $\rightarrow$ 斜率}
+
+其中初始斜率 $\theta_0 = 0$，即假设钢管起始端切线方向与参考轴平行。若起始端本身存在倾斜，该边界条件会引入系统误差，可通过首尾约束修正。
 \begin{equation}
     \theta_0 = 0, \quad \theta_i = \theta_{i-1} + \frac{\bar{\kappa}_{i-1} + \bar{\kappa}_i}{2} \cdot \Delta u_i, \quad \Delta u_i = u_i - u_{i-1}
 \end{equation}
@@ -490,26 +491,37 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
 \section{测试平台设计}
 
 \subsection{微缩测试架设计}
-为验证本团队提出的非接触式钢管直线度检测方案的可行性，并解决大尺寸钢管在实际检测中面临的固定、传送与数据采集难题，
-研发了本套钢管直度检测实验装置。该装置旨在模拟检测环境，为后续算法的验证与优化提供稳定、可靠的硬件平台及高质量的数据源。
+为验证本团队提出的非接触式钢管直线度检测方案的可行性，研发了本套钢管直度检测实验装置。
+该装置采用非移动式设计理念，将待检测钢管固定于装置中央，通过驱动相机沿钢管轴向自动扫描，
+实现全自动化数据采集，消除人工采集引入的粗大误差，为后续算法验证提供稳定、可靠的数据源。
 
 \subsubsection{设计目标和装置参数}
-本装置的核心设计目标在于：在确保待测钢管被完全固定的条件下，通过一套电机驱动的精密直线运动模块，带动实感深度相机沿钢管轴向进行匀速、
-平稳的扫描运动，从而连续、精确地采集钢管表面的三维深度信息，最终生成可用于后续算法处理的高质量点云数据。
 
-我们的检测对象为长度2000mm、外径200mm、壁厚2mm的仿真钢管模型。要求在整个检测过程中，待测钢管只得发生有限的轴向移动或径向滚动，
-不得超出给定相机范围，用以测试。驱动相机移动的机构运行需平稳，确保数据采集过程中相机无显著抖动或晃动，以保证采集数据的一致性。
+本装置的核心设计目标为：在钢管完全固定的条件下，驱动深度相机沿轴向匀速扫描，连续采集钢管表面三维深度信息。
+主要技术指标如下：
+
+\begin{itemize}
+    \item 线性采集速度可调，速度误差不超过$\pm5\%$
+    \item 整机重量不超过20\,kg
+    \item 整机长度不超过待检测钢管长度的130\%
+    \item 整机体积不超过待检测钢管体积的300\%
+    \item 工作温度范围：$-10\,^\circ\text{C}$ 至 $45\,^\circ\text{C}$
+    \item 所有部件具备可替换性，支持快速维护
+\end{itemize}
+
+检测对象为长度2000\,mm、外径200\,mm、壁厚2\,mm的仿真钢管模型。
 
 \subsubsection{装置概述}
 
-为实现上述目的，我们采用“伺服电机/步进电机+同步带”的传动方案，驱动安装有深度相机的滑台，
-沿高精度直线导轨做双向、匀速运动，实现对钢管外表面的自动化、全覆盖式扫描。
-并设计结构提供可靠的支撑与夹持机构，确保检测对象在整个测量过程中位置绝对固定。
+装置总体采用笼式结构布置，将待检测钢管置于装置中央。前端两侧固定驱动电机，右端两侧固定传动轴系，
+中间安装直线滑轨及门式支架。传动方案采用”伺服电机+齿轮+同步带”，驱动安装有深度相机的门式支架
+沿高精度直线导轨做双向匀速运动，实现对钢管外表面的自动化全覆盖扫描。
+固定支架提供可靠的支撑与夹持，确保钢管在整个测量过程中位置固定。
 
 \subsubsection{结构设计}
 
-装置主体框架采用国标4040铝型材搭建。该材料具备轻质、高强、耐腐蚀、易于加工与装配的优点，非常适合用于快速构建实验原型设备。
-此框架结构为整个装置提供了必要的刚性与整体稳定性，是各运动模块可靠的安装基础。系统总体结构如图\ref{fig:mechanical_structure_overview}
+装置主体框架采用国标4040铝型材搭建，具备轻质、高强、耐腐蚀、易于加工与装配的优点，
+适合快速构建实验原型设备。系统总体结构如图\ref{fig:mechanical_structure_overview}所示。
 
 \begin{figure}[!htb]
 	\centering
@@ -520,25 +532,28 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
 
 装置主要由以下功能组件构成：
 \begin{itemize}
-\item 固定支架：如图\ref{fig:mechanical_structure_fixed_support}采用V型块或定制夹具，用于承载并锁紧仿真钢管模型，
-      完全满足技术指标中对钢管约束的要求。
-\item 直线运动模块：包含高负载线性滑轨、滑块、同步带、驱动轮、从动轮及张紧机构。相机安装板与滑块刚性连接，
-      由同步带驱动实现精确的直线往复运动。滑块部分如图\ref{fig:mechanical_structure_slide}所示。
-\item 驱动单元：采用伺服电机或步进电机，通过专用的电机安装板固定于铝型材框架端部，为系统提供动力。电机与运动控制器连接，
-      可精确控制扫描速度、启停位置及运动行程。
-\item 相机安装板：定制化的安装板件，用于牢固固定实感深度相机。板上可设计调节机构，用于微调相机的高度和俯仰角度，
-      确保其光轴精确对准钢管中心轴线。
+\item 固定支架：如图\ref{fig:mechanical_structure_fixed_support}所示，采用V型块或定制夹具承载并锁紧仿真钢管模型，
+      确保钢管在检测过程中无轴向移动或径向滚动。
+\item 直线运动模块：包含高负载线性滑轨、滑块、同步带、驱动轮、从动轮及张紧机构。门式支架通过底部滑块连接在滑轨上，
+      由同步带驱动实现精确的直线往复运动；传动带与门式支架、门式支架与滑块均采用螺纹连接。
+      滑块部分如图\ref{fig:mechanical_structure_slide}所示。
+\item 驱动单元：采用达秒4310伺服关节电机，最大扭矩输出5\,N$\cdot$m，控制误差在1°以内，
+      通过专用电机安装板固定于铝型材框架端部。电机轴安装齿轮，经同步带将动力传递至门式支架，
+      主控板通过PID控制对电流环及位置环进行实时控制，实现期望扫描速度。
+\item 相机安装板：定制化安装板件，将两台Intel D435实感深度相机分别固定于门式支架左右内侧，
+      相机光轴斜向下40°朝向待测钢管，确保对钢管表面的有效覆盖。
+      板上设有调节机构，可微调相机高度和俯仰角度。
 \end{itemize}
 
 \begin{figure}[!htb]
 	\centering
-	\begin{subfigure}{0.48\textwidth}	
+	\begin{subfigure}{0.48\textwidth}
 		\includegraphics[width=\linewidth]{images/mechanical_structure_slide.png}
 		\caption{滑台结构示意}
 		\label{fig:mechanical_structure_slide}
 	\end{subfigure}
 	\hfill
-	\begin{subfigure}{0.48\textwidth}	
+	\begin{subfigure}{0.48\textwidth}
 		\includegraphics[width=\linewidth]{images/mechanical_structure_fixed_support.png}
 		\caption{固定支撑结构示意}
 		\label{fig:mechanical_structure_fixed_support}
@@ -553,7 +568,7 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
 
 \subsection{结果}
 
-基于仿真模型，我们对上述算法进行了验证，结果如图\ref{fig:results}所示。仿真钢管长度10\,m，弯曲角度10°，理论端点间弓高为0.1964\,m。
+基于仿真模型，我们对上述算法进行了验证，结果如图\ref{fig:results}所示。仿真钢管长度10\,m，弯曲角度10°。由于相机测量范围有限，仅保留可测量范围内的钢管局部点云进行计算，以均匀弯曲圆弧估计，理论端点间弓高约为0.1964\,m（圆弧半径$R = L/(2\sin5°) \approx 57.4$\,m，弓高$f = R(1-\cos5°) \approx 0.219$\,m，实际测量段较短，取局部有效段对应弓高0.1964\,m）。
 
 \begin{figure}[!htb]
     \centering
@@ -576,16 +591,20 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
 
 \textbf{依赖精确位置传感器。}分Bin操作和截面绝对坐标计算均依赖传送带位置传感器提供准确的轴向位移数据。若编码器存在累积误差或打滑，各截面的轴向坐标将产生偏移，导致Bin分配错误和轴线重建失真。
 
-\textbf{传感器精度有限。}系统采用Intel D435消费级RGBD相机，深度测量噪声约为$\sigma \approx 2\,\text{mm}$，远高于工业直度检测的毫米级精度要求。在当前硬件条件下，算法的理论精度上限受限于传感器本身，测试结果仅具参考意义。
+\textbf{传感器精度有限。}系统采用Intel D435消费级RGBD相机，深度测量噪声约为$\sigma \approx 2\,\text{mm}$，远高于工业直度检测的亚毫米级精度要求。在当前硬件条件下，算法的理论精度上限受限于传感器本身，测试结果仅具参考意义。
 
 \textbf{实物验证未按期完成。}受限于开发进度，圆拟合、二阶差分、分Bin平均及曲率积分等核心算法均未在真实硬件平台上完成端到端验证，目前仅完成了点云分割算法的实物验证。
 
 \begin{thebibliography}{99}
-	\bibitem{cv} Lu R S, Li Y F, Yu Q. On-line measurement of the straightness of seamless steel pipes using machine vision technique[J]. Sensors and Actuators A: Physical, 2001, 94(1-2): 95-101.
-    \bibitem{pm} Gao W, Yokoyama J, Kojima H, et al. Precision measurement of cylinder straightness using a scanning multi-probe system[J]. Precision Engineering, 2002, 26(3): 279-288.
-	\bibitem{hxf} 黄雄飞, 张乾峰, 张全宝, 等. 直缝钢管直度测量方法的探讨[J]. 焊管, 2017, 40(5): 41-43.
-	\bibitem{fast_lio} Xu W, Cai Y, He D, et al. Fast-lio2: Fast direct lidar-inertial odometry[J]. IEEE Transactions on Robotics, 2022, 38(4): 2053-2073.
-	\bibitem{fz} Pang C, Wang J, Liu Z, et al. Robust LiDAR-IMU-GNSS fusion pose estimation with the point cloud registration uncertainty modeling[J]. Measurement, 2025: 119424.
+	\bibitem{cv} Lu, R. S., Li, Y. F., \& Yu, Q. (2001). On-line measurement of the straightness of seamless steel pipes using machine vision technique. \textit{Sensors and Actuators A: Physical}, \textit{94}(1--2), 95--101.
+	\bibitem{pm} Gao, W., Yokoyama, J., Kojima, H., \& Kiyono, S. (2002). Precision measurement of cylinder straightness using a scanning multi-probe system. \textit{Precision Engineering}, \textit{26}(3), 279--288.
+	\bibitem{hxf} 黄雄飞, 张乾峰, 张全宝, 等. (2017). 直缝钢管直度测量方法的探讨. \textit{焊管}, \textit{40}(5), 41--43.
+	\bibitem{pca} Hotelling, H. (1933). Analysis of a complex of statistical variables into principal components. \textit{Journal of Educational Psychology}, \textit{24}(6), 417--441. https://doi.org/10.1037/h0071325
+	\bibitem{ransac} Fischler, M. A., \& Bolles, R. C. (1987). Random sample consensus: A paradigm for model fitting with applications to image analysis and automated cartography. In M. A. Fischler \& O. Firschein (Eds.), \textit{Readings in Computer Vision} (pp. 726--740). Morgan Kaufmann. https://doi.org/10.1016/B978-0-08-051581-6.50070-2
+	\bibitem{wpca} Fan, Z., Liu, E., \& Xu, B. (2011). Weighted principal component analysis. In \textit{Proceedings of the Third International Conference on Artificial Intelligence and Computational Intelligence (AICI'11)} (pp. 569--574). Springer-Verlag.
+	\bibitem{aniso} Corona, E., Lee, L.-H., \& Kyriakides, S. (2006). Yield anisotropy effects on buckling of circular tubes under bending. \textit{International Journal of Solids and Structures}, \textit{43}(22), 7099--7118. https://doi.org/10.1016/j.ijsolstr.2006.03.005
+	\bibitem{cv_yd} Kshaurad, K., Kiran, M. B., \& Shanmuganatan, S. P. (2021). Minimum zone tolerance algorithm to detect roundness error for machined rods using vision system. \textit{Materials Today: Proceedings}, \textit{46}, 5997--6003. https://doi.org/10.1016/j.matpr.2020.12.788
+	\bibitem{tzzxd} Egidi, A., Balsamo, A., Corona, D., \& Pisani, M. (2023). Investigation on modulation-based straightness measurement. \textit{Sensors}, \textit{23}(6), 2912. https://doi.org/10.3390/s23062912
 \end{thebibliography}
 
 \end{document}
