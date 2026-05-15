@@ -44,6 +44,8 @@ private:
   double tilt_angle_{0.0};       // static tilt around z-axis (rad)
   double tilt_vib_amplitude_{0.0};  // angular vibration amplitude (rad)
   double tilt_vib_frequency_{0.5};  // angular vibration frequency (Hz)
+  double drift_z_{0.0};             // z drift per full stroke (m)
+  double drift_angle_{0.0};         // angle drift per full stroke (rad)
   double elapsed_s_{0.0};
   int direction_{0};
   std::string tf_frame_id_{"world"};

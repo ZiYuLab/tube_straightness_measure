@@ -15,13 +15,14 @@
 
 #include "tsm/tsm_node.hpp"
 #include "ament_index_cpp/get_package_share_directory.hpp"
+#include "Eigen/Dense"
 
 namespace tsm
 {
 
 void TsmNode::postProcess()
 {
-  if (diff_bins_.size() < 3 || abs_bins_.size() < 3)
+  if (bins_.size() < 3)
   {
     RCLCPP_WARN(
         get_logger(),
@@ -31,118 +32,99 @@ void TsmNode::postProcess()
 
   RCLCPP_INFO(get_logger(), "Post-processing...");
 
-  std::vector<Eigen::Vector3f> center_points_wls_;
-  std::vector<Eigen::Vector3f> center_points_integrator_;
-  std::vector<Eigen::Vector3f> center_points_abs_;
-
-  wls(diff_bins_, abs_bins_, center_points_wls_);
-  integrator(diff_bins_, abs_bins_, center_points_integrator_);
-  for (const auto& [idx, bd] : abs_bins_)
+  // 1. Collect per-bin mean absolute position and kappa.
+  int                          n = static_cast<int>(bins_.size());
+  std::vector<Eigen::Vector3f> pts(n);
+  std::vector<float>           w(n), kappas(n);
   {
-    float x =
-        (idx + 0.5f) * static_cast<float>(params_.integral_process_.bin_length);
-    float y = bd.sum.y() / bd.count;
-    float z = bd.sum.z() / bd.count;
-    center_points_abs_.push_back(Eigen::Vector3f(x, y, z));
+    int i = 0;
+    for (const auto& [idx, bd] : bins_)
+    {
+      pts[i] = bd.sum_c / static_cast<float>(bd.count);
+      w[i] = static_cast<float>(bd.count);
+      kappas[i] = static_cast<float>(bd.sum_kappa / bd.count);
+      i++;
+    }
   }
 
-  // By AI
-
-  struct StraightnessResult
+  // 2. Weighted centroid.
+  float           W = 0.0f;
+  Eigen::Vector3f centroid = Eigen::Vector3f::Zero();
+  for (int i = 0; i < n; i++)
   {
-    float                        straightness = 0.0f;
-    std::vector<Eigen::Vector2f> plot_xy;
-    std::vector<float>           distances;
-  };
+    centroid += w[i] * pts[i];
+    W += w[i];
+  }
+  centroid /= W;
 
-  auto evalStragainstOwnRefLine =
-      [&](const std::vector<Eigen::Vector3f>& centers) -> StraightnessResult {
-    StraightnessResult out;
-    if (centers.size() < 2)
-      return out;
+  // 3. Weighted covariance → PCA.
+  Eigen::Matrix3f C = Eigen::Matrix3f::Zero();
+  for (int i = 0; i < n; i++)
+  {
+    Eigen::Vector3f q = pts[i] - centroid;
+    C += w[i] * q * q.transpose();
+  }
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eig(C / W);
+  // Eigenvalues ascending: col(2)=axis direction, col(1)=primary bending.
+  Eigen::Vector3f e1 = eig.eigenvectors().col(2);
+  Eigen::Vector3f e2 = eig.eigenvectors().col(1);
 
-    const Eigen::Vector3f ref_p0 = centers.front();
-    const Eigen::Vector3f ref_p1 = centers.back();
-    const Eigen::Vector3f ref_ex = ref_p1 - ref_p0;
-    if (ref_ex.norm() < 1e-6f)
-      return out;
+  // 4. Project onto (e1, e2), shift first point to origin.
+  std::vector<BinProj> projected(n);
+  for (int i = 0; i < n; i++)
+  {
+    Eigen::Vector3f q = pts[i] - centroid;
+    projected[i] = {e1.dot(q), e2.dot(q), kappas[i]};
+  }
+  const float u0 = projected[0].u, v0 = projected[0].v;
+  for (auto& p : projected)
+  {
+    p.u -= u0;
+    p.v -= v0;
+  }
 
-    const Eigen::Vector3f ref_dir = ref_ex.normalized();
-    Eigen::Vector3f       guide = Eigen::Vector3f::UnitY();
-    if (std::abs(guide.dot(ref_dir)) > 0.95f)
-      guide = Eigen::Vector3f::UnitZ();
-    const Eigen::Vector3f ref_ey =
-        (guide - guide.dot(ref_dir) * ref_dir).normalized();
-
-    float y_max = std::numeric_limits<float>::lowest();
-
-    out.plot_xy.reserve(centers.size());
-    out.distances.reserve(centers.size());
-
-    for (const auto& p : centers)
-    {
-      const Eigen::Vector3f rel = p - ref_p0;
-      const float           x = rel.dot(ref_dir);
-
-      // perp 是纯 3D 垂直偏差向量
-      const Eigen::Vector3f perp = rel - x * ref_dir;
-
-      // 1. 严格计算 3D 空间中的真实偏离距离
-      const float dist = perp.norm();
-
-      // 2. 根据投影方向判断符号 (与局部 Y 轴同向为正，反向为负)
-      const float sign = (perp.dot(ref_ey) >= 0.0f) ? 1.0f : -1.0f;
-
-      // 3. 组合成 带符号的真实距离
-      const float signed_dist = dist * sign;
-
-      out.plot_xy.emplace_back(x, signed_dist);
-      out.distances.push_back(dist);
-
-      y_max = std::max(y_max, dist);
-    }
-
-    // 最终的直线度评价值
-    out.straightness = std::abs(y_max);
-    return out;
-  };
-
-  auto saveCsv = [&](const std::string&        path,
-                     const StraightnessResult& result) {
-    std::ofstream ofs(path);
-    if (!ofs.is_open())
-    {
-      RCLCPP_WARN(get_logger(), "Failed to open %s", path.c_str());
+  // Evaluate straightness against the line connecting first and last point,
+  // save CSV, and log the result.
+  auto evalAndSave = [&](const std::vector<Eigen::Vector2f>& pts,
+                         const std::string&                  path) {
+    if (pts.size() < 2)
       return;
+
+    const Eigen::Vector2f p0 = pts.front();
+    const Eigen::Vector2f p1 = pts.back();
+    const Eigen::Vector2f dir = (p1 - p0).normalized();
+    const Eigen::Vector2f nor(-dir.y(), dir.x()); // left-hand normal
+
+    std::ofstream ofs(path);
+    ofs << "u,proj,dist\n";
+
+    float max_dist = 0.0f;
+    for (const auto& p : pts)
+    {
+      float proj = (p - p0).dot(dir);
+      float dist = std::abs((p - p0).dot(nor)); // un signed
+      ofs << p.x() << "," << proj << "," << dist << "\n";
+      max_dist = std::max(max_dist, dist);
     }
 
-    ofs << "x,signed_y,distance\n";
-    for (size_t i = 0; i < result.plot_xy.size(); ++i)
-      ofs << result.plot_xy[i].x() << "," << result.plot_xy[i].y() << ","
-          << result.distances[i] << "\n";
+    RCLCPP_INFO(
+        get_logger(), "Straightness [%s]: %.6f m", path.c_str(), max_dist);
   };
 
-  const auto abs_result = evalStragainstOwnRefLine(center_points_abs_);
-  const auto integrator_result =
-      evalStragainstOwnRefLine(center_points_integrator_);
-  const auto wls_result = evalStragainstOwnRefLine(center_points_wls_);
-
-  RCLCPP_INFO(
-      get_logger(), "Abs straightness: %.6f m", abs_result.straightness);
-  RCLCPP_INFO(get_logger(),
-              "Integrator straightness: %.6f m",
-              integrator_result.straightness);
-  RCLCPP_INFO(
-      get_logger(), "WLS straightness: %.6f m", wls_result.straightness);
-
-  const auto package_share_directory =
-      ament_index_cpp::get_package_share_directory("tsm");
-  const std::string& save_dir = package_share_directory + "/results";
+  const auto        pkg = ament_index_cpp::get_package_share_directory("tsm");
+  const std::string save_dir = pkg + "/results";
   std::filesystem::create_directories(save_dir);
 
-  saveCsv(save_dir + "/abs_track.csv", abs_result);
-  saveCsv(save_dir + "/integrator_track.csv", integrator_result);
-  saveCsv(save_dir + "/wls_track.csv", wls_result);
+  std::vector<Eigen::Vector2f> abs_pts(n), integrator_pts, wls_pts;
+  for (int i = 0; i < n; i++)
+    abs_pts[i] = Eigen::Vector2f(projected[i].u, projected[i].v);
+
+  integrator(projected, integrator_pts);
+  wls(projected, wls_pts);
+
+  evalAndSave(abs_pts, save_dir + "/abs_track.csv");
+  evalAndSave(integrator_pts, save_dir + "/integrator_track.csv");
+  evalAndSave(wls_pts, save_dir + "/wls_track.csv");
 }
 
 } // namespace tsm

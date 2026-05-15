@@ -27,6 +27,8 @@ TsmGzSimNode::TsmGzSimNode(const rclcpp::NodeOptions& options)
   tilt_angle_          = declare_parameter<double>("tilt_angle", 0.0);
   tilt_vib_amplitude_  = declare_parameter<double>("tilt_vib_amplitude", 0.0);
   tilt_vib_frequency_  = declare_parameter<double>("tilt_vib_frequency", 0.5);
+  drift_z_             = declare_parameter<double>("drift_z", 0.0);
+  drift_angle_         = declare_parameter<double>("drift_angle", 0.0);
 
   dt_s_ = timer_ms / 1000.0;
   x_start_ = -tube_length / 2.0;
@@ -82,7 +84,9 @@ void TsmGzSimNode::onTimer()
 
   double vib_y = vib_amplitude_ * std::sin(2.0 * M_PI * vib_frequency_ * elapsed_s_);
   double vib_z = vib_amplitude_ * std::sin(2.0 * M_PI * vib_frequency_ * elapsed_s_ + M_PI / 3.0);
-  double angle = tilt_angle_ +
+  double stroke = x_end_ - x_start_;
+  double t = (x_pos_ - x_start_) / stroke; // 0→1 forward, 1→0 backward
+  double angle = tilt_angle_ + drift_angle_ * t +
                  tilt_vib_amplitude_ * std::sin(2.0 * M_PI * tilt_vib_frequency_ * elapsed_s_);
   // Rotation around z-axis by angle (half-angle for quaternion)
   double half = angle * 0.5;
@@ -91,7 +95,7 @@ void TsmGzSimNode::onTimer()
   req.set_name(tube_model_name_);
   req.mutable_position()->set_x(x_pos_);
   req.mutable_position()->set_y(vib_y);
-  req.mutable_position()->set_z(vib_z);
+  req.mutable_position()->set_z(vib_z + drift_z_ * t);
   req.mutable_orientation()->set_w(std::cos(half));
   req.mutable_orientation()->set_z(std::sin(half));
 

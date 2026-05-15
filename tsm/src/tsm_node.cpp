@@ -224,7 +224,7 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
 
   pcl::VoxelGrid<PointT> vgf;
   vgf.setInputCloud(merged);
-  vgf.setLeafSize(0.015f, 0.015f, 0.015f);
+  vgf.setLeafSize(0.005f, 0.005f, 0.005f);
   vgf.filter(*processed);
 
   // TODO: Minimum points
@@ -325,77 +325,50 @@ void TsmNode::onPointClouds(const PC2::ConstSharedPtr& pc1,
   f1.wait();
   f2.wait();
 
-  // 8. Compute second order difference for this frame.
-  Eigen::Vector2f m1 = center1.segment<2>(1);
-  Eigen::Vector2f m2 = center2.segment<2>(1);
-  Eigen::Vector2f m3 = center3.segment<2>(1);
-  float           d = center2.x() - center1.x();
-  Eigen::Vector2f ms = (m3 - 2 * m2 + m1) / (d * d);
+  // 8. Translate the center back to world frame.
+  auto c1_w = q.conjugate() * center1;
+  auto c2_w = q.conjugate() * center2;
+  auto c3_w = q.conjugate() * center3;
 
-  Eigen::Vector3f ms_3d(center2.x(), ms.x(), ms.y());
+  // 9. Compute second order difference for this frame.
+  float           d = ((c2_w - c1_w).norm() + (c3_w - c2_w).norm()) * 0.5f;
+  Eigen::Vector3f delta2 = c3_w - 2.0f * c2_w + c1_w;
+  float           kappa = delta2.norm() / (d * d);
 
-  // 9. transform the 2-diff data to tube frame.
-  Eigen::Matrix3f R_pca = transform.block<3, 3>(0, 0);
-  const float     tube_world_x = world_to_tube.transform.translation.x;
-
-  Eigen::Vector3f ms_world =
-      R_pca.transpose() * Eigen::Vector3f(0, ms.x(), ms.y());
-  Eigen::Vector3f& ms_tube = ms_world;
-
-  //   const float pos_tube_x = center2_world.x() - tube_world_x;
-  const float pos_tube_x = center2.x() - tube_world_x;
-
-  // Absolute center position: x uses tube displacement, y/z keep PCA-corrected
-  // lateral offsets.
-  Eigen::Vector3f center2_tube(pos_tube_x, center2.y(), center2.z());
-
-  const int bin_idx = static_cast<int>(
+  // 10. Bin and accumulate.
+  const float tube_world_x = world_to_tube.transform.translation.x;
+  const float pos_tube_x = c2_w.x() - tube_world_x;
+  const int   bin_idx = static_cast<int>(
       std::floor(pos_tube_x / params_.integral_process_.bin_length));
 
-  // Reject outlier curvature values (threshold: 10 m^-2)
-  if (std::abs(ms_tube.y()) > 10.0f || std::abs(ms_tube.z()) > 10.0f)
+  if (kappa > 10.0f)
   {
-    RCLCPP_WARN(get_logger(),
-                "Outlier curvature rejected: (%.3f, %.3f)",
-                ms_tube.y(),
-                ms_tube.z());
+    RCLCPP_WARN(get_logger(), "Outlier curvature rejected: %.3f", kappa);
   }
   else
   {
-    {
-      // Second order difference
-      auto&           bd = diff_bins_.emplace(bin_idx, BinData{}).first->second;
-      Eigen::Vector3f v(pos_tube_x, ms_tube.y(), ms_tube.z());
-      bd.sum += v;
-      bd.sum_sq += v.cwiseProduct(v);
-      bd.count++;
-    }
-    {
-      // Absolute center
-      auto&           bd = abs_bins_.emplace(bin_idx, BinData{}).first->second;
-      Eigen::Vector3f v(pos_tube_x, center2_tube.y(), center2_tube.z());
-      bd.sum += v;
-      bd.sum_sq += v.cwiseProduct(v);
-      bd.count++;
-    }
+    auto&           bd = bins_.emplace(bin_idx, BinData{}).first->second;
+    Eigen::Vector3f v(pos_tube_x, c2_w.y(), c2_w.z());
+    bd.sum_c += v;
+    bd.sum_c_sq += v.cwiseProduct(v);
+    bd.sum_kappa += kappa;
+    bd.sum_kappa_sq += kappa * kappa;
+    bd.count++;
   }
 
-  // 10. Log stauts.
+  // 11. Log status.
   auto   end = std::chrono::steady_clock::now();
   double t_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(end - start_time)
           .count();
-  const auto bin_it = diff_bins_.find(bin_idx);
-  const int  current_bin_count =
-      bin_it != diff_bins_.end() ? bin_it->second.count : 0;
-  RCLCPP_INFO(
-      get_logger(),
-      "tube_x: %.2f, bins: %zu, pts_in_bin: %d, scan_x: %.2f m, using: %.2f ms",
-      tube_world_x,
-      diff_bins_.size(),
-      current_bin_count,
-      pos_tube_x,
-      t_ms);
+  RCLCPP_INFO(get_logger(),
+              "tube_x: %.2f, bins: %zu, kappa: %.4f, scan_x: %.2f m, "
+              "using: %.2f ms",
+              tube_world_x,
+              bins_.size(),
+              kappa,
+              pos_tube_x,
+              t_ms);
 }
 
 TsmNode::~TsmNode() { postProcess(); }

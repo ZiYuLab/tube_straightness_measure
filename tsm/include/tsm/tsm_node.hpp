@@ -55,18 +55,23 @@ private:
 
   struct BinData
   {
-    Eigen::Vector3f sum = Eigen::Vector3f::Zero();
-    Eigen::Vector3f sum_sq = Eigen::Vector3f::Zero();
+    Eigen::Vector3f sum_c = Eigen::Vector3f::Zero();
+    Eigen::Vector3f sum_c_sq = Eigen::Vector3f::Zero();
+    double          sum_kappa = 0.0;
+    double          sum_kappa_sq = 0.0;
     int             count = 0;
   };
 
-  void integrator(const std::map<int, BinData>& diff_bins,
-                  const std::map<int, BinData>& abs_bins,
-                  std::vector<Eigen::Vector3f>& center_points);
+  struct BinProj
+  {
+    float u, v, kappa;
+  };
 
-  void wls(const std::map<int, BinData>& diff_bins,
-           const std::map<int, BinData>& abs_bins,
-           std::vector<Eigen::Vector3f>& center_points);
+  void integrator(const std::vector<BinProj>&   projected,
+                  std::vector<Eigen::Vector2f>& center_points);
+
+  void wls(const std::vector<BinProj>&   projected,
+           std::vector<Eigen::Vector2f>& center_points);
 
   void postProcess();
 
@@ -93,8 +98,8 @@ private:
     } frames_;
 
     // Valid PC area
-    // Cut the point cloud to a box area around the tube to remove outliers and
-    // background points.
+    // Cut the point cloud to a box area around the tube to
+    // remove outliers and background points.
     struct
     {
       double x_min = -0.5;
@@ -123,7 +128,7 @@ private:
 
     struct
     {
-      double bin_length = 0.1;
+      double bin_length = 0.01;
       double w_kappa = 1.0;
       double w_abs = 0.1;
       double lambda = 1e-4;
@@ -147,8 +152,7 @@ private:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
       centerline_pub_;
 
-  std::map<int, BinData> diff_bins_;
-  std::map<int, BinData> abs_bins_;
+  std::map<int, BinData> bins_;
 };
 
 } // namespace tsm

@@ -10,8 +10,11 @@ tsm_gz_sim_node:
     tf_child_frame_id: tube
     # Noise 1: translational vibration (yz direction, zero-mean)
     vib_amplitude: 0.01   # m
-    vib_frequency: 0.5     # Hz
+    vib_frequency: 1.0     # Hz
     # Noise 2: static tilt + angular vibration around z-axis
-    tilt_angle: 0.01           # rad (~0.57 deg static tilt)
-    tilt_vib_amplitude: 0.005  # rad angular vibration amplitude
-    tilt_vib_frequency: 0.5    # Hz
+    tilt_angle: 0.00           # rad (~0.57 deg static tilt)
+    tilt_vib_amplitude: 0.01  # rad angular vibration amplitude
+    tilt_vib_frequency: 1.0    # Hz
+    # Drift: linear change over one full stroke (forward), reversed on return
+    drift_z: 0.05               # m, z height increase over full stroke
+    drift_angle: 0.04          # rad, angle increase over full stroke

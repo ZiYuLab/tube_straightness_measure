@@ -1,7 +1,7 @@
 tsm_node:
   ros__parameters:
     cutting_fittting:
-      length_of_each_segment: 0.1
+      length_of_each_segment: 0.005
       ransac_max_iterations: 100
       ransac_distance_threshold: 0.005
       min_points_in_segment: 200
@@ -9,7 +9,7 @@ tsm_node:
       measurement_noise_sigma: 0.0
 
     integral_process:
-      bin_length: 0.1
+      bin_length: 0.05
       w_kappa: 100.0    # curvature term weight
       w_abs: 1.0      # absolute position term weight
       lambda: 0.0001  # smoothness regularization
