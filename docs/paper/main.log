@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.3.29)  16 MAY 2026 02:35
+This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.3.29)  16 MAY 2026 16:55
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1177,8 +1177,8 @@ File: images/pose_plot.png Graphic file (type bmp)
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [12]
-File: images/mechanical_structure_overview.png Graphic file (type bmp)
-<images/mechanical_structure_overview.png>
+File: images/real_device.jpeg Graphic file (type bmp)
+<images/real_device.jpeg>
 
 [13]
 File: images/mechanical_structure_slide.png Graphic file (type bmp)
@@ -1187,10 +1187,7 @@ File: images/mechanical_structure_fixed_support.png Graphic file (type bmp)
 <images/mechanical_structure_fixed_support.png>
 File: images/straightness_plot_fixed_radius.png Graphic file (type bmp)
 <images/straightness_plot_fixed_radius.png>
- [14]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [15]
+ [14] [15]
 Underfull \hbox (badness 2368) in paragraph at lines 602--603
 []\TU/lmr/m/n/10.53937 Hotelling, H. (1933). Analysis of a complex of statistic
 al variables into
@@ -1242,8 +1239,8 @@ L3 programming layer <2022/07/14>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 20611 strings out of 468168
- 425205 string characters out of 5432815
+ 20612 strings out of 468168
+ 425054 string characters out of 5432815
  901719 words of memory out of 5000000
  49012 multiletter control sequences out of 15000+600000
  636012 words of font info for 93 fonts, out of 8000000 for 9000
