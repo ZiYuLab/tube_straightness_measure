@@ -55,6 +55,7 @@
     并通过二阶差分法消除传感器安装误差与钢管刚体运动引入的旋转平移误差，有效抑制钢管轴向进给过程中位移抖动对测量精度的影响。
     在此基础上，利用分Bin平均降低随机测量噪声，再经加权PCA降维与两次数值积分重建钢管轴线偏差曲线，最终计算直度。
     我们搭建了基于铝型材框架与伺服电机直线模组的微缩测试平台，验证了点云分割算法的有效性，为后续算法验证提供了稳定的数据来源。
+    本文相关代码已开源，见 \url{https://github.com/ZiYuLab/tube_straightness_measure}。
 \end{abstract}
 
 \section{引言}
@@ -380,6 +381,8 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
 
 \subsubsection{加权PCA降维}
 
+为了得到钢管坐标系的真实方向，避免因钢管系统旋转平移偏差导致的重建偏差，因此我们需要对绝坐标进行加权PCA\cite{wpca}处理得到钢管坐标系x轴线
+
 对中心点序列以样本数$M_i$为权重进行加权去中心化：
 \begin{equation}
     \tilde{\mathbf{p}}_i = \bar{\mathbf{p}}_i - \bar{\mathbf{p}}_w, \quad \bar{\mathbf{p}}_w = \frac{\sum_i M_i \bar{\mathbf{p}}_i}{\sum_i M_i}
@@ -390,7 +393,7 @@ RANSAC得到初值后，将圆心和半径作为优化变量 $\mathbf{x} = [y_c,
     \mathbf{C} = \frac{1}{\sum_i M_i} \sum_{i=0}^{N-1} M_i\, \tilde{\mathbf{p}}_i \tilde{\mathbf{p}}_i^\top \in \mathbb{R}^{3\times 3}
 \end{equation}
 
-对$\mathbf{C}$做特征值分解，特征值排序$\lambda_1 \ge \lambda_2 \ge \lambda_3 \ge 0$，对应单位特征向量$\mathbf{e}_1, \mathbf{e}_2, \mathbf{e}_3$\cite{wpca}。其中$\mathbf{e}_1$为轴线方向，$\mathbf{e}_2$为主弯曲方向。
+对$\mathbf{C}$做特征值分解，特征值排序$\lambda_1 \ge \lambda_2 \ge \lambda_3 \ge 0$，对应单位特征向量$\mathbf{e}_1, \mathbf{e}_2, \mathbf{e}_3$。其中$\mathbf{e}_1$为轴线方向，$\mathbf{e}_2$为主弯曲方向。
 
 将各中心点投影至主弯曲平面$(\mathbf{e}_1, \mathbf{e}_2)$，并以第一个点为原点平移：
 \begin{equation}

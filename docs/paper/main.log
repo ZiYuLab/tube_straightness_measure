@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.3.29)  16 MAY 2026 16:55
+This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.3.29)  16 MAY 2026 17:12
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1147,7 +1147,45 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 (/usr/local/texlive/2026/texmf-dist/tex/latex/microtype/mt-msb.cfg
 File: mt-msb.cfg 2005/06/01 v1.0 microtype config. file: AMS symbols (b) (RS)
-) [1
+)
+
+Package fontspec Info: 
+(fontspec)             Script 'CJK' not explicitly supported within font
+(fontspec)             'STFangsong'. Check the typeset output, and if it is
+(fontspec)             okay then ignore this warning. Otherwise a different
+(fontspec)             font should be chosen.
+
+
+Package fontspec Info: 
+(fontspec)             Could not resolve font "STFangsong/BI" (it probably
+(fontspec)             doesn't exist).
+
+
+Package fontspec Info: 
+(fontspec)             Could not resolve font "STFangsong/B" (it probably
+(fontspec)             doesn't exist).
+
+
+Package fontspec Info: 
+(fontspec)             Could not resolve font "STFangsong/I" (it probably
+(fontspec)             doesn't exist).
+
+Package microtype Info: Loading generic protrusion settings for font family
+(microtype)             `lmtt' (encoding: TU).
+(microtype)             For optimal results, create family-specific settings.
+(microtype)             See the microtype manual for details.
+
+Package fontspec Info: 
+(fontspec)             Font family 'STFangsong(0)' created for font
+(fontspec)             'STFangsong' with options [Script={CJK}].
+(fontspec)              
+(fontspec)              This font family consists of the following NFSS
+(fontspec)             series/shapes:
+(fontspec)              
+(fontspec)             - 'normal' (m/n) with NFSS spec.:
+(fontspec)             <->"STFangsong/OT:script=hani;language=dflt;"
+
+ [1
 
 
 ]
@@ -1163,7 +1201,7 @@ File: images/frame_def.png Graphic file (type bmp)
 File: images/cutting.png Graphic file (type bmp)
 <images/cutting.png>
  [6] [7] [8]
-Underfull \hbox (badness 4779) in paragraph at lines 373--374
+Underfull \hbox (badness 4779) in paragraph at lines 374--375
 []\TU/STSong(0)/m/n/10.53937 经 过 上 述 分 \TU/lmr/m/n/10.53937 Bin \TU/STSong(0)/m
 /n/10.53937 平 均 处 理 后，|  即 可 得 到 由 一 系 列 等 间 距 的 平 滑 中 心 点
  []
@@ -1188,45 +1226,45 @@ File: images/mechanical_structure_fixed_support.png Graphic file (type bmp)
 File: images/straightness_plot_fixed_radius.png Graphic file (type bmp)
 <images/straightness_plot_fixed_radius.png>
  [14] [15]
-Underfull \hbox (badness 2368) in paragraph at lines 602--603
+Underfull \hbox (badness 2368) in paragraph at lines 605--606
 []\TU/lmr/m/n/10.53937 Hotelling, H. (1933). Analysis of a complex of statistic
 al variables into
  []
 
 
-Underfull \hbox (badness 2126) in paragraph at lines 602--603
+Underfull \hbox (badness 2126) in paragraph at lines 605--606
 \TU/lmr/m/n/10.53937 principal components. \TU/lmr/m/it/10.53937 Journal of Edu
 cational Psychology\TU/lmr/m/n/10.53937 , \TU/lmr/m/it/10.53937 24\TU/lmr/m/n/1
 0.53937 (6), 417–441.
  []
 
 
-Underfull \hbox (badness 4168) in paragraph at lines 606--607
+Underfull \hbox (badness 4168) in paragraph at lines 609--610
 []\TU/lmr/m/n/10.53937 Kshaurad, K., Kiran, M. B., & Shanmuganatan, S. P. (2021
 ). Min-
  []
 
 
-Underfull \hbox (badness 3158) in paragraph at lines 606--607
+Underfull \hbox (badness 3158) in paragraph at lines 609--610
 \TU/lmr/m/n/10.53937 imum zone tolerance algorithm to detect roundness error fo
 r machined
  []
 
 
-Underfull \hbox (badness 2495) in paragraph at lines 606--607
+Underfull \hbox (badness 2495) in paragraph at lines 609--610
 \TU/lmr/m/n/10.53937 rods using vision system. \TU/lmr/m/it/10.53937 Materials 
 Today: Proceedings\TU/lmr/m/n/10.53937 , \TU/lmr/m/it/10.53937 46\TU/lmr/m/n/10
 .53937 , 5997–6003.
  []
 
 
-Underfull \hbox (badness 3428) in paragraph at lines 607--608
+Underfull \hbox (badness 3428) in paragraph at lines 610--611
 []\TU/lmr/m/n/10.53937 Egidi, A., Balsamo, A., Corona, D., & Pisani, M. (2023).
  Investiga-
  []
 
 
-Underfull \hbox (badness 1838) in paragraph at lines 607--608
+Underfull \hbox (badness 1838) in paragraph at lines 610--611
 \TU/lmr/m/n/10.53937 tion on modulation-based straightness measurement. \TU/lmr
 /m/it/10.53937 Sensors\TU/lmr/m/n/10.53937 , \TU/lmr/m/it/10.53937 23\TU/lmr/m/
 n/10.53937 (6), 2912.
@@ -1239,11 +1277,11 @@ L3 programming layer <2022/07/14>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 20612 strings out of 468168
- 425054 string characters out of 5432815
- 901719 words of memory out of 5000000
- 49012 multiletter control sequences out of 15000+600000
- 636012 words of font info for 93 fonts, out of 8000000 for 9000
+ 20635 strings out of 468168
+ 425545 string characters out of 5432815
+ 902719 words of memory out of 5000000
+ 49025 multiletter control sequences out of 15000+600000
+ 636052 words of font info for 98 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
  93i,9n,114p,1001b,642s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
